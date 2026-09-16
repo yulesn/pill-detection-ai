@@ -8,6 +8,7 @@ data:
   max_objects_per_image: 4
 
 model:
+  framework: null # TODO: yolo 또는 torchvision 중 팀에서 채택한 트랙으로 채우기
   name: null # TODO: 팀에서 프레임워크/모델 결정 후 채우기 (예: yolov8s, fasterrcnn_resnet50_fpn)
   pretrained: true
 
