@@ -1,0 +1,24 @@
+# 기본 설정 파일. 새 실험을 시작할 때는 이 파일을 복사해서
+# configs/exp2.yaml 처럼 이름을 바꾸고 값만 수정해서 사용한다.
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  num_classes: 56
+  max_objects_per_image: 4
+
+model:
+  framework: yolo # TODO: yolo 또는 torchvision 중 팀에서 채택한 트랙으로 채우기
+  name: yolo26n.pt # TODO: 팀에서 프레임워크/모델 결정 후 채우기 (예: yolov8s, fasterrcnn_resnet50_fpn)
+  pretrained: true
+
+train:
+  epochs: 50
+  batch_size: 16
+  learning_rate: 0.001
+  seed: 42
+  device: cpu # 학습 서버에서는 cuda로 변경
+
+output:
+  dir: outputs
+  experiment_name: exp1_yolo26n
