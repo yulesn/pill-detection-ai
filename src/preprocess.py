@@ -342,28 +342,21 @@ def split_dataset(
 def create_processed_dirs(processed_dir):
     """
     YOLO 데이터셋 저장을 위한 디렉토리를 생성한다.
+    기존 전처리 결과는 삭제하고 새로 생성한다.
     """
 
     for split in ["train", "val"]:
+        image_dir = processed_dir / "images" / split
+        label_dir = processed_dir / "labels" / split
 
-        (
-            processed_dir
-            / "images"
-            / split
-        ).mkdir(
-            parents=True,
-            exist_ok=True
-        )
+        if image_dir.exists():
+            shutil.rmtree(image_dir)
 
-        (
-            processed_dir
-            / "labels"
-            / split
-        ).mkdir(
-            parents=True,
-            exist_ok=True
-        )
+        if label_dir.exists():
+            shutil.rmtree(label_dir)
 
+        image_dir.mkdir(parents=True, exist_ok=True)
+        label_dir.mkdir(parents=True, exist_ok=True)
 
 # ============================================================
 # 10. 이미지 및 YOLO Label 저장
@@ -669,13 +662,26 @@ def main():
             f"image_id: {item['image_id']}, "
             f"file_name: {item['file_name']}"
         )
-    # Annotation이 2개인 이미지 제외
-    for item in two_ann_images:
-        del image_data[item["image_id"]]
+ 
+    # EDA에서 확인한 이상 데이터
+    exclude_image_ids = {
+        16, 193, 208, 239, 783, 907,
+        1228, 1258, 1267, 1383, 1405, 1432
+    }
+
+
+    # 이상 데이터만 제외
+    # 해당 ID가 있으면 삭제하고, 
+    # 혹시 없으면 KeyError가 발생하지 않도록 pop()의 두 번째 인자를 None으로 설정
+    for image_id in exclude_image_ids:
+        image_data.pop(image_id, None)
+
+
     print(
-        "Annotation이 2개인 이미지 제외 후 남은 이미지 수:",
+        "EDA 이상 데이터 제외 후 남은 이미지 수:",
         len(image_data)
     )
+
     # --------------------------------------------------------
     # 4. Category mapping
     # --------------------------------------------------------
