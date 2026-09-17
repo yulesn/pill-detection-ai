@@ -24,11 +24,9 @@ def build_model(config: dict):
         raise NotImplementedError("YOLO 분기를 구현해주세요.")
 
     if framework == "torchvision":
-        # TODO(torchvision 트랙): torchvision detection 모델 생성
-        # import torchvision
-        # return torchvision.models.detection.__dict__[model_name](
-        #     pretrained=config["model"]["pretrained"]
-        # )
-        raise NotImplementedError("torchvision 분기를 구현해주세요.")
+        import torchvision
+        return torchvision.models.detection.__dict__[model_name](
+            pretrained=config["model"]["pretrained"]
+        )
 
     raise ValueError(f"지원하지 않는 framework입니다: {framework}")
