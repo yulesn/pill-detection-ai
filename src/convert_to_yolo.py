@@ -9,10 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from PIL import Image
 from collections import Counter
-import os
 import pandas as pd
 from ultralytics import YOLO
 from sklearn.model_selection import train_test_split
+import yaml
     
 
 
@@ -285,7 +285,20 @@ def split_data(project_path, image_informations):
     move_files(image_dir, ann_dir, save_dir, train_images, 'train')
     move_files(image_dir, ann_dir, save_dir, val_images, 'val')
     
+def save_data_yaml(label_map):
+    '''configs/data.yaml파일 생성'''
+    names_dict = {idx:code for code, idx in label_map.items()}
 
+    yaml_data = {
+        'path': 'data/processed',
+        'train': 'train/images',
+        'val': 'val/images',
+        'nc': len(names_dict),
+        'names': names_dict
+    }
+
+    with open('configs/data.yaml', 'w', encoding='utf-8') as f:
+        yaml.dump(yaml_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
 
@@ -308,7 +321,8 @@ def main() -> None:
     convert_ann_file_to_txt(my_project_path, verified_image_informations, label_map)
     # train과 validation 데이터 분리 후 저장
     split_data(my_project_path, verified_image_informations)
-
+    # 데이터 정보를 data_yaml 파일로 저장
+    save_data_yaml(label_map)
 
 if __name__ == '__main__':
     main()
