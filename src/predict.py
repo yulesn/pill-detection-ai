@@ -21,10 +21,20 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
+    framework = config["model"]["framework"]
     model = build_model(config)
 
-    # TODO: checkpoint 로드, 이미지 전처리, 추론 후 클래스+bbox 출력
-    raise NotImplementedError("추론 로직을 구현해주세요.")
+    if framework == "yolo":
+        # TODO(YOLO 트랙): model.predict(args.image, conf=...) 결과를 파싱해서
+        # (클래스, bbox) 리스트로 출력
+        raise NotImplementedError("YOLO 추론 로직을 구현해주세요.")
+
+    if framework == "torchvision":
+        # TODO(torchvision 트랙): args.checkpoint 로드, 이미지 전처리,
+        # 커스텀 추론 후 (클래스, bbox) 리스트로 출력
+        raise NotImplementedError("torchvision 추론 로직을 구현해주세요.")
+
+    raise ValueError(f"지원하지 않는 framework입니다: {framework}")
 
 
 if __name__ == "__main__":
