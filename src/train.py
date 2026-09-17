@@ -34,11 +34,45 @@ def main() -> None:
         raise NotImplementedError("YOLO 학습 루프를 구현해주세요.")
 
     if framework == "torchvision":
-        # TODO(torchvision 트랙): PillDataset으로 train/val DataLoader 구성,
-        # build_model(config)로 모델 생성, 커스텀 학습 루프 작성,
-        # config["output"]["dir"]/config["output"]["experiment_name"] 아래에 체크포인트 저장
-        raise NotImplementedError("torchvision 학습 루프를 구현해주세요.")
+        import torch
+        from torch.utils.data import DataLoader
+        from dataset import PillDataset
 
+        def collate_fn(batch):
+            return tuple(zip(*batch))
+
+        dataset = PillDataset(config["data"]["raw_dir"] + "/sprint_ai_project1_data", train=True)
+        loader = DataLoader(
+            dataset,
+            batch_size=config["train"]["batch_size"],
+            shuffle=True,
+            collate_fn=collate_fn,
+        )
+
+        device = torch.device(config["train"]["device"])
+        model = build_model(config)
+        model.to(device)
+
+        params = [p for p in model.parameters() if p.requires_grad]
+        optimizer = torch.optim.SGD(params, lr=config["train"]["learning_rate"], momentum=0.9)
+
+        model.train()
+        for epoch in range(config["train"]["epochs"]):
+            epoch_loss = 0.0
+            for images, targets in loader:
+                images = [img.to(device) for img in images]
+                targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
+
+                loss_dict = model(images, targets)
+                loss = sum(loss_dict.values())
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                epoch_loss += loss.item()
+
+            print(f"[Epoch {epoch+1}/{config['train']['epochs']}] loss: {epoch_loss / len(loader):.4f}")
+        return
     raise ValueError(f"지원하지 않는 framework입니다: {framework}")
 
 

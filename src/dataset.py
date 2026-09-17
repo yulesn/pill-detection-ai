@@ -12,6 +12,7 @@ from torchvision.transforms import v2
 # transform=None일 때 최소한 텐서 변환은 되도록 기본값 제공
 DEFAULT_TRANSFORM = v2.Compose([
     v2.ToImage(),
+    v2.Resize((800, 610)),
     v2.ToDtype(torch.float32, scale=True),
 ])
 
@@ -35,7 +36,7 @@ class CustomCOCO:
         excluded_names = excluded_names or set()
 
         for annotation_file in Path(annotation_dir).rglob("*.json"):
-            if annotation_file.stem in excluded_names:  # ← 추가된 부분
+            if annotation_file.stem in excluded_names:
                 continue
 
             with open(annotation_file, "r", encoding="utf-8") as f:
@@ -75,6 +76,11 @@ class PillDataset(Dataset):
 
     train=True일 때, EDA에서 확인된 라벨 누락 의심 이미지
     (data/processed/excluded_images.json)는 자동으로 제외된다.
+
+    category_id(dl_idx, 원본 알약 코드)는 값의 범위가 넓어 분류기 클래스 수와
+    맞지 않으므로, 0(배경)을 제외한 1~N 사이 연속 번호로 재매핑하여 사용한다.
+    raw_id_to_label: 원본 dl_idx -> 재매핑된 라벨
+    label_to_raw_id: 재매핑된 라벨 -> 원본 dl_idx (예측 결과 해석 시 사용)
     """
 
     def __init__(self, data_dir: str, train: bool, transform=DEFAULT_TRANSFORM):
@@ -85,10 +91,15 @@ class PillDataset(Dataset):
         self.categories = {}
         if train:
             annotation_path = data_dir / f"{self.train}_annotations"
-            excluded_names = load_excluded_names()  # ← 추가된 부분
+            excluded_names = load_excluded_names()
             self.coco = CustomCOCO(annotation_path, excluded_names=excluded_names)
             for cat_id, cat in self.coco.categories.items():
                 self.categories[cat_id] = cat["name"]
+
+            sorted_ids = sorted(self.categories.keys())
+            self.raw_id_to_label = {raw_id: i + 1 for i, raw_id in enumerate(sorted_ids)}
+            self.label_to_raw_id = {v: k for k, v in self.raw_id_to_label.items()}
+
         self.data = self._load_data()
 
     def _load_data(self):
@@ -106,7 +117,7 @@ class PillDataset(Dataset):
                 for ann in self.coco.annotations[img_id]:
                     x, y, w, h = ann["bbox"]
                     boxes.append([x, y, x + w, y + h])
-                    labels.append(ann["category_id"])
+                    labels.append(self.raw_id_to_label[ann["category_id"]])
                 target = {
                     "image_id": torch.LongTensor([img_id]),
                     "boxes": torch.FloatTensor(boxes),
