@@ -104,6 +104,7 @@ class PillDataset(Dataset):
             "image_id": torch.tensor([index]),
         }
 
-        if self.transform:
+        # transform이 존재할 경우 적용
+        if self.transform is not None:
             image = self.transform(image)
         return image, target
