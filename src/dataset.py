@@ -49,8 +49,11 @@ class CustomCOCO:
 class PillDataset(Dataset):
     """이미지와 (클래스, bbox) 라벨을 반환하는 Dataset.
 
-    한 이미지에 최대 4개의 알약이 있으므로, 이미지당 최대 4개의
-    (label, bbox) 쌍을 반환하도록 구현한다.
+    __getitem__은 (image, target)을 반환한다.
+    - image: tv_tensors.Image, shape (3, H, W), float32, [0, 1]
+    - target (train): {"image_id": LongTensor(1,), "boxes": BoundingBoxes(N, 4) XYXY,
+      "labels": LongTensor(N,) raw category_id} — N은 이미지당 알약 개수(가변)
+    - target (test): {} (라벨 없음)
     """
 
     def __init__(self, data_dir: str, train: bool, transform=DEFAULT_TRANSFORM):
