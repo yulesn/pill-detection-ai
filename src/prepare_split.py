@@ -42,7 +42,7 @@ def parse_args() -> argparse.Namespace:
 def load_annotations(annotation_dir: Path) -> tuple[dict, dict, dict]:
     """annotation_dir 아래 json들을 image_id 기준으로 모은다.
 
-    반환: (images: {image_id: info}, annotations: {image_id: [ann, ...]},
+    return: (images: {image_id: info}, annotations: {image_id: [ann, ...]},
            categories: {cat_id: cat})
     """
     images: dict = {}
@@ -62,15 +62,16 @@ def load_annotations(annotation_dir: Path) -> tuple[dict, dict, dict]:
 
 
 def is_match_image_and_ann(image_name, ann_size):
-    '''알약의 개수와 bbox 개수가 일치하는지 확인'''
+    """알약의 개수와 bbox 개수가 일치하는지 확인"""
     group_id = image_name.split('_')[0]
     category_ids = group_id.split('-')[1:]
     # 파일명에 포함된 알약의 개수가 추출된 bbox의 개수와 같은지 확인
     return True if len(category_ids) == ann_size else False
 
 
-# bbox 간 겹침 정도 IOU를 계산하는 함수
+
 def compute_iou(box1, box2):
+    """bbox 간 겹침 정도 IOU를 계산"""
     x1, y1, w1, h1 = box1
     x2, y2, w2, h2 = box2
 
@@ -183,13 +184,8 @@ def stratified_split(
 
 
 def build_cat_id_to_label(categories: dict) -> dict:
-    """원본 category_id를 정렬 순서 기준 0-index 라벨로 매핑한다.
-
-    PillDataset(dataset.py)의 cat_id_to_label과 동일한 컨벤션
-    (sorted(category_id) 순서로 enumerate)을 따라야 두 데이터셋이
-    같은 라벨 체계를 쓰게 된다.
-    """
-    return {cat_id: i for i, cat_id in enumerate(sorted(categories))}
+    """원본 category_id를 정렬 순서 기준 0-index 라벨로 매핑한다."""
+    return {cat_id: i+1 for i, cat_id in enumerate(sorted(categories))}
 
 
 def copy_split(
