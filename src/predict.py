@@ -11,6 +11,7 @@
 
 import argparse
 import csv
+import json
 from pathlib import Path
 
 import torch
@@ -20,6 +21,15 @@ from PIL import Image
 from dataset import DEFAULT_TRANSFORM
 from model import build_model
 from utils import load_config
+
+
+def load_label_to_category_id(processed_dir: Path) -> dict[int, int]:
+    """prepare_split.py가 저장한 category_mapping.json을 읽어 모델이 예측하는
+    라벨(1-index)을 원본 category_id로 되돌리는 매핑을 만든다."""
+    mapping_path = processed_dir / "splits" / "category_mapping.json"
+    with open(mapping_path) as f:
+        mapping = json.load(f)
+    return {entry["label"]: entry["category_id"] for entry in mapping}
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,6 +45,7 @@ def predict_image(
     device,
     score_threshold: float,
     max_objects_per_image: int,
+    label_to_category_id: dict[int, int],
     nms_iou_threshold: float = 0.5,
 ) -> list[dict]:
     # test 이미지 파일명(예: "1.png")이 곧 image_id
@@ -59,7 +70,7 @@ def predict_image(
 
     results = []
     for box, label, score in zip(boxes, labels, scores):
-        category_id = label.item()
+        category_id = label_to_category_id[label.item()]
         x1, y1, x2, y2 = box.tolist()
         results.append(
             {
@@ -82,6 +93,7 @@ def predict_torchvision(
     device,
     score_threshold: float,
     max_objects_per_image: int,
+    label_to_category_id: dict[int, int],
 ) -> list[dict]:
     model.load_state_dict(torch.load(checkpoint, map_location=device))
     model.to(device)
@@ -91,7 +103,14 @@ def predict_torchvision(
     image_paths = sorted(test_images_dir.glob("*.png"), key=lambda p: int(p.stem))
     for image_path in image_paths:
         results.extend(
-            predict_image(model, image_path, device, score_threshold, max_objects_per_image)
+            predict_image(
+                model,
+                image_path,
+                device,
+                score_threshold,
+                max_objects_per_image,
+                label_to_category_id,
+            )
         )
     return results
 
@@ -130,6 +149,7 @@ def main() -> None:
     if framework == "torchvision":
         device = torch.device(config["train"]["device"])
         test_images_dir = Path(config["data"]["raw_dir"]) / "sprint_ai_project1_data" / "test_images"
+        label_to_category_id = load_label_to_category_id(Path(config["data"]["processed_dir"]))
 
         results = predict_torchvision(
             model,
@@ -138,6 +158,7 @@ def main() -> None:
             device,
             config["predict"]["score_threshold"],
             config["data"]["max_objects_per_image"],
+            label_to_category_id,
         )
         experiment_name = config["output"]["experiment_name"]
         output_path = Path(config["output"]["dir"]) / "predictions" / f"{experiment_name}.csv"

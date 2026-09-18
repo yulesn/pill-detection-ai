@@ -24,7 +24,7 @@ class PillDataset(Dataset):
     __getitem__은 (image, target)을 반환한다.
     - image: tv_tensors.Image, shape (3, H, W), float32, [0, 1]
     - target: {"image_id": LongTensor(1,), "boxes": BoundingBoxes(N, 4) XYXY,
-      "labels": LongTensor(N,) 0-index 클래스 번호} — N은 이미지당 알약 개수(가변)
+      "labels": LongTensor(N,) 1-index 클래스 번호 (0은 배경용으로 비움)} — N은 이미지당 알약 개수(가변)
     """
 
     def __init__(self, data_dir: str, transform=DEFAULT_TRANSFORM):
@@ -33,9 +33,11 @@ class PillDataset(Dataset):
         self.image_path = data_dir / "images"
         annotation_path = data_dir / "annotations.json"
         self.coco = COCO(str(annotation_path))
+        # annotations.json의 category_id는 prepare_split.py가 이미
+        # (배경용 0을 비워둔) 1-index 라벨로 리매핑해서 저장한 값이므로
+        # 그대로 라벨로 쓴다. 원본 category_id로 되돌리려면
+        # data/processed/splits/category_mapping.json을 사용한다.
         self.categories = {cat_id: cat["name"] for cat_id, cat in self.coco.cats.items()}
-        self.cat_id_to_label = {cat_id: i for i, cat_id in enumerate(sorted(self.categories))}
-        self.label_to_cat_id = {i: cat_id for cat_id, i in self.cat_id_to_label.items()}
         self.data = self._load_data()
 
     def _load_data(self):
@@ -51,7 +53,7 @@ class PillDataset(Dataset):
             for ann in anns:
                 x, y, w, h = ann["bbox"]
                 boxes.append([x,y,x+w, y+h])
-                labels.append(self.cat_id_to_label[ann["category_id"]])
+                labels.append(ann["category_id"])
             target = {
                 "image_id": torch.LongTensor([img_id]),
                 "boxes": torch.FloatTensor(boxes),

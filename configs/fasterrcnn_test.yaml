@@ -2,7 +2,7 @@
 data:
   raw_dir: data/raw
   processed_dir: data/processed
-  num_classes: 56
+  num_classes: 57 # 알약 56종 + 배경(0)
   max_objects_per_image: 4
   val_ratio: 0.2 # train/val split 시 val로 뺄 비율 (prepare_split.py)
 
