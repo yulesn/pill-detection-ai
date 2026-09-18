@@ -5,6 +5,7 @@
 """
 
 import argparse
+import csv
 import os
 
 from dataset import PillDataset
@@ -27,6 +28,7 @@ def main() -> None:
     config = load_config(args.config)
     set_seed(config["train"]["seed"])
     framework = config["model"]["framework"]
+    exp_name = config["output"]["experiment_name"]
 
     if framework == "yolo":
         raise NotImplementedError("YOLO 학습 루프를 구현해주세요.")
@@ -67,6 +69,13 @@ def main() -> None:
         optimizer = torch.optim.SGD(params, lr=config["train"]["learning_rate"], momentum=0.9)
         scaler = GradScaler("cuda")
 
+        # 이번 실험(exp_name)의 epoch별 loss를 기록할 로그 파일 준비
+        log_dir = os.path.join(config["output"]["dir"], "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, f"kimgun_{exp_name}_losses.csv")
+        with open(log_path, "w", newline="", encoding="utf-8") as f:
+            csv.writer(f).writerow(["epoch", "train_loss", "val_loss"])
+
         best_val_loss = float("inf")
 
         for epoch in range(config["train"]["epochs"]):
@@ -88,8 +97,7 @@ def main() -> None:
                 train_loss += loss.item()
             train_loss /= len(train_loader)
 
-            # ---- 검증 (torchvision detection 모델은 train() 모드에서만 loss를 반환하므로,
-            #      역전파 없이 no_grad로 감싸서 검증 loss만 계산) ----
+            # ---- 검증 ----
             val_loss = 0.0
             with torch.no_grad():
                 for images, targets in val_loader:
@@ -103,6 +111,10 @@ def main() -> None:
 
             print(f"[Epoch {epoch+1}/{config['train']['epochs']}] train_loss: {train_loss:.4f} / val_loss: {val_loss:.4f}")
 
+            # 로그 파일에 이번 epoch 결과 한 줄 추가
+            with open(log_path, "a", newline="", encoding="utf-8") as f:
+                csv.writer(f).writerow([epoch + 1, round(train_loss, 4), round(val_loss, 4)])
+
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 save_dir = os.path.join(config["output"]["dir"], "checkpoints")
@@ -111,7 +123,7 @@ def main() -> None:
                     "model_state_dict": model.state_dict(),
                     "label_to_raw_id": train_dataset.label_to_raw_id,
                     "categories": train_dataset.categories,
-                }, os.path.join(save_dir, f"kimgun_{config['output']['experiment_name']}_best.pt"))
+                }, os.path.join(save_dir, f"kimgun_{exp_name}_best.pt"))
                 print(f"  -> best 갱신, 저장됨 (val_loss: {best_val_loss:.4f})")
         return
     raise ValueError(f"지원하지 않는 framework입니다: {framework}")
