@@ -19,6 +19,9 @@ train:
   seed: 42
   device: cpu # 학습 서버에서는 cuda로 변경
 
+predict:
+  score_threshold: 0.5
+
 output:
   dir: outputs
   experiment_name: default

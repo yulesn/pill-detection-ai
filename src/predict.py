@@ -14,6 +14,7 @@ import csv
 from pathlib import Path
 
 import torch
+import torchvision
 from PIL import Image
 
 from dataset import DEFAULT_TRANSFORM
@@ -25,11 +26,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/default.yaml")
     parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--score-threshold", type=float, default=0.5)
     return parser.parse_args()
 
 
-def predict_image(model, image_path: Path, device, score_threshold: float) -> list[dict]:
+def predict_image(
+    model,
+    image_path: Path,
+    device,
+    score_threshold: float,
+    max_objects_per_image: int,
+    nms_iou_threshold: float = 0.5,
+) -> list[dict]:
     # test 이미지 파일명(예: "1.png")이 곧 image_id
     image_id = int(image_path.stem)
 
@@ -39,8 +46,19 @@ def predict_image(model, image_path: Path, device, score_threshold: float) -> li
     with torch.no_grad():
         output = model([input_tensor])[0]
 
+    boxes, labels, scores = output["boxes"], output["labels"], output["scores"]
+    keep = scores >= score_threshold
+    boxes, labels, scores = boxes[keep], labels[keep], scores[keep]
+
+    # torchvision 모델의 NMS는 클래스별로만 적용되어, 같은 물체를 다른 카테고리로
+    # 예측해 겹치는 박스가 남을 수 있다. 클래스 무관 NMS를 한 번 더 적용해서 걸러낸다.
+    # nms()는 살아남은 인덱스를 score 내림차순으로 반환하므로, 이어서 상위
+    # max_objects_per_image개만 자르면 이미지당 최대 알약 개수 제한도 함께 적용된다.
+    keep = torchvision.ops.nms(boxes, scores, nms_iou_threshold)[:max_objects_per_image]
+    boxes, labels, scores = boxes[keep], labels[keep], scores[keep]
+
     results = []
-    for box, label, score in zip(output["boxes"], output["labels"], output["scores"]):
+    for box, label, score in zip(boxes, labels, scores):
         category_id = label.item()
         x1, y1, x2, y2 = box.tolist()
         results.append(
@@ -58,7 +76,12 @@ def predict_image(model, image_path: Path, device, score_threshold: float) -> li
 
 
 def predict_torchvision(
-    model, checkpoint: str, test_images_dir: Path, device, score_threshold: float
+    model,
+    checkpoint: str,
+    test_images_dir: Path,
+    device,
+    score_threshold: float,
+    max_objects_per_image: int,
 ) -> list[dict]:
     model.load_state_dict(torch.load(checkpoint, map_location=device))
     model.to(device)
@@ -67,7 +90,9 @@ def predict_torchvision(
     results = []
     image_paths = sorted(test_images_dir.glob("*.png"), key=lambda p: int(p.stem))
     for image_path in image_paths:
-        results.extend(predict_image(model, image_path, device, score_threshold))
+        results.extend(
+            predict_image(model, image_path, device, score_threshold, max_objects_per_image)
+        )
     return results
 
 
@@ -107,7 +132,12 @@ def main() -> None:
         test_images_dir = Path(config["data"]["raw_dir"]) / "sprint_ai_project1_data" / "test_images"
 
         results = predict_torchvision(
-            model, args.checkpoint, test_images_dir, device, args.score_threshold
+            model,
+            args.checkpoint,
+            test_images_dir,
+            device,
+            config["predict"]["score_threshold"],
+            config["data"]["max_objects_per_image"],
         )
         experiment_name = config["output"]["experiment_name"]
         output_path = Path(config["output"]["dir"]) / "predictions" / f"{experiment_name}.csv"
