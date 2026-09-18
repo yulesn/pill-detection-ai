@@ -15,7 +15,7 @@ train:
   batch_size: 8 # batch_size: 16 -> 8
   learning_rate: 0.001
   seed: 42
-  device: cpu # 학습 서버에서는 cuda로 변경
+  device: cuda # 학습 서버에서는 cuda로 변경
 
 output:
   dir: outputs
