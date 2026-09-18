@@ -25,8 +25,28 @@ def build_model(config: dict):
 
     if framework == "torchvision":
         import torchvision
-        return torchvision.models.detection.__dict__[model_name](
+
+        model = torchvision.models.detection.__dict__[model_name](
             pretrained=config["model"]["pretrained"]
         )
+        num_classes = config["data"]["num_classes"]
+        if num_classes is not None:
+            _replace_classification_head(model, num_classes)
+        return model
 
     raise ValueError(f"지원하지 않는 framework입니다: {framework}")
+
+
+def _replace_classification_head(model, num_classes: int) -> None:
+    """COCO 사전학습 head를 데이터셋 클래스 수(num_classes, 배경 포함)에 맞게 교체한다."""
+    if hasattr(model, "roi_heads"):
+        # Faster R-CNN 계열
+        from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    #elif hasattr(model, "head") and hasattr(model.head, "classification_head"):   
+    else:
+        raise NotImplementedError(
+            f"{type(model).__name__}의 분류 head 교체 로직이 구현되어 있지 않습니다."
+        )
