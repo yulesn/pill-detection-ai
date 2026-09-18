@@ -32,6 +32,8 @@ def build_model(config: dict):
         num_classes = config["data"]["num_classes"]
         if num_classes is not None:
             _replace_classification_head(model, num_classes)
+        if config["model"].get("freeze_backbone"):
+            _freeze_backbone(model)
         return model
 
     raise ValueError(f"지원하지 않는 framework입니다: {framework}")
@@ -45,8 +47,14 @@ def _replace_classification_head(model, num_classes: int) -> None:
 
         in_features = model.roi_heads.box_predictor.cls_score.in_features
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-    #elif hasattr(model, "head") and hasattr(model.head, "classification_head"):   
+    #elif hasattr(model, "head") and hasattr(model.head, "classification_head"):
     else:
         raise NotImplementedError(
             f"{type(model).__name__}의 분류 head 교체 로직이 구현되어 있지 않습니다."
         )
+
+
+def _freeze_backbone(model) -> None:
+    """backbone 파라미터를 얼려서 학습 속도를 높인다 (pretrained feature를 그대로 사용)."""
+    for param in model.backbone.parameters():
+        param.requires_grad = False
