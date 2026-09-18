@@ -203,7 +203,7 @@ def copy_split(
 
     split_dir/images에 이미지를, split_dir/annotations.json에
     {"images": [...], "annotations": [...], "categories": [...]} 형태로 저장하므로,
-    PillDataset(split_dir, train=True, ...)로 바로 읽을 수 있다.
+    PillDataset(split_dir, ...)로 바로 읽을 수 있다.
     """
     dst_image_dir = split_dir / "images"
     if split_dir.exists():
