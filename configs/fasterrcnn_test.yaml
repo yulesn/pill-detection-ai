@@ -8,20 +8,22 @@ data:
 
 model:
   framework: torchvision
-  name: fasterrcnn_resnet50_fpn
+  name: fasterrcnn_resnet50_fpn_v2
   pretrained: true
-  freeze_backbone: true # backbone(resnet50) 가중치를 얼려서 학습 속도를 높임
+  freeze_backbone: false 
 
 train:
-  epochs: 50
+  epochs: 100
   batch_size: 8
   learning_rate: 0.001
+  lr_patience: 5 
+  lr_factor: 0.5 
   seed: 42
   device: cpu
 
 predict:
-  score_threshold: 0.5
+  score_threshold: 0.3
 
 output:
   dir: outputs
-  experiment_name: default
+  experiment_name: fasterrcnn_exp

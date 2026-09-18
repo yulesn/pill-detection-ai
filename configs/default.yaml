@@ -16,6 +16,8 @@ train:
   epochs: 50
   batch_size: 16
   learning_rate: 0.001
+  lr_patience: 5 # val_loss가 이 epoch 수만큼 개선 안 되면 lr 감소
+  lr_factor: 0.5 # lr 감소 시 곱할 비율
   seed: 42
   device: cpu # 학습 서버에서는 cuda로 변경
 

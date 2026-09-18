@@ -26,9 +26,10 @@ def build_model(config: dict):
     if framework == "torchvision":
         import torchvision
 
-        model = torchvision.models.detection.__dict__[model_name](
-            pretrained=config["model"]["pretrained"]
-        )
+        # torchvision >=0.13부터 pretrained=bool은 deprecated. weights="DEFAULT"가
+        # 해당 모델의 최신 사전학습 가중치를 쓰라는 뜻이고, None이면 랜덤 초기화.
+        weights = "DEFAULT" if config["model"]["pretrained"] else None
+        model = torchvision.models.detection.__dict__[model_name](weights=weights)
         num_classes = config["data"]["num_classes"]
         if num_classes is not None:
             _replace_classification_head(model, num_classes)

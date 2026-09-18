@@ -9,6 +9,7 @@ from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
+from torchvision.transforms import v2
 from tqdm import tqdm
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -16,6 +17,22 @@ from pycocotools.cocoeval import COCOeval
 from dataset import PillDataset
 from model import build_model
 from utils import load_config, set_seed
+
+
+train_transform = v2.Compose([
+    v2.ToImage(),
+    #밝기/대비/채도/색조를 무작위로 변화
+    v2.RandomPhotometricDistort(p=0.5),     
+    #캔버스를 최대 2배까지 확장하고 원본 이미지를 그 안 무작위 위치에 배치
+    v2.RandomZoomOut(fill=0, side_range=(1.0, 2.0), p=0.3),     
+    #원본의 일부를 무작위로 잘라내되, 남은 박스가 원래 박스와 충분히 겹치도록
+    v2.RandomIoUCrop(),
+    #좌우 반전
+    v2.RandomHorizontalFlip(p=0.5),
+    #크롭/줌 과정에서 화면 밖으로 밀려나거나 크기가 0에 가깝게 찌그러진 박스를 제거
+    v2.SanitizeBoundingBoxes(),
+    v2.ToDtype(torch.float32, scale=True),
+])
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,7 +74,7 @@ def train_torchvision(config: dict) -> None:
     device = torch.device(config["train"]["device"])
     processed_dir = Path(config["data"]["processed_dir"])
 
-    train_dataset = PillDataset(processed_dir / "train")
+    train_dataset = PillDataset(processed_dir / "train", transform=train_transform)
     val_dataset = PillDataset(processed_dir / "val")
     train_loader = DataLoader(
         train_dataset,
@@ -77,6 +94,10 @@ def train_torchvision(config: dict) -> None:
     optimizer = torch.optim.SGD(
         params, lr=config["train"]["learning_rate"], momentum=0.9, weight_decay=0.0005
     )
+    # val_loss가 lr_patience epoch 동안 개선되지 않으면 lr을 lr_factor배로 줄인다.
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=config["train"]["lr_factor"], patience=config["train"]["lr_patience"]
+    )
 
     checkpoint_dir = (
         Path(config["output"]["dir"]) / "checkpoints" / config["output"]["experiment_name"]
@@ -91,9 +112,12 @@ def train_torchvision(config: dict) -> None:
         with torch.no_grad():
             val_loss = run_epoch(model, val_loader, device, optimizer=None)
 
+        scheduler.step(val_loss)
+
         print(
             f"[epoch {epoch}/{config['train']['epochs']}] "
-            f"train_loss={train_loss:.4f} val_loss={val_loss:.4f}"
+            f"train_loss={train_loss:.4f} val_loss={val_loss:.4f} "
+            f"lr={optimizer.param_groups[0]['lr']:.6f}"
         )
 
         torch.save(model.state_dict(), checkpoint_dir / "last.pt")
