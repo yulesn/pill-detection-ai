@@ -32,7 +32,7 @@ def collate_fn(batch):
 
 def to_device(images, targets, device):
     images = [image.to(device) for image in images]
-    targets = [target.to(device) for target in targets]
+    targets = [{k: v.to(device) for k, v in target.items()} for target in targets]
     return images, targets
 
 
