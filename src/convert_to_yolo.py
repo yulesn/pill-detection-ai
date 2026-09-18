@@ -231,8 +231,8 @@ def convert_ann_file_to_txt(project_path, image_informations, label_map) -> None
             class_id = label_map[label]
             x_min, y_min, w, h = bbox
             # Normalization
-            x_center = ((x_min+w) / 2) / image_w    
-            y_center = ((y_min+h) / 2) / image_h
+            x_center = (x_min + (w/2)) / image_w    
+            y_center = (y_min + (h/2)) / image_h
             norm_w = w / image_w
             norm_h = h / image_h
 
