@@ -453,7 +453,9 @@ def create_data_yaml(
         for i in range(num_classes)
     ]
 
-    yaml_text = """path: .
+    data_path = processed_dir.resolve().as_posix()
+
+    yaml_text = f"""path: {data_path}
 train: images/train
 val: images/val
 

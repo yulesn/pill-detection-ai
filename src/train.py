@@ -1,31 +1,65 @@
-"""학습 실행 스크립트.
+"""YOLO 모델 학습 실행 스크립트.
 
 사용 예:
     python src/train.py --config configs/default.yaml
 """
 
 import argparse
+from pathlib import Path
 
-from dataset import PillDataset
-from model import build_model
+from ultralytics import YOLO
+
 from utils import load_config, set_seed
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="configs/default.yaml")
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="configs/default.yaml",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+
+    # 설정 파일 로드
     config = load_config(args.config)
+
+    # 랜덤 시드 설정
     set_seed(config["train"]["seed"])
 
-    # TODO: PillDataset으로 train/val DataLoader 구성
-    # TODO: build_model(config)로 모델 생성
-    # TODO: 학습 루프 작성, config["output"]["dir"]/config["output"]["experiment_name"] 아래에 체크포인트 저장
-    raise NotImplementedError("학습 루프를 구현해주세요.")
+    # 데이터 및 모델 설정
+    data_dir = Path(config["data"]["processed_dir"])
+    data_yaml = data_dir / "data.yaml"
+
+    model_name = config["model"]["name"]
+
+    # 학습 설정
+    epochs = config["train"]["epochs"]
+    batch_size = config["train"]["batch_size"]
+    learning_rate = config["train"]["learning_rate"]
+    device = config["train"]["device"]
+
+    # 출력 설정
+    output_dir = config["output"]["dir"]
+    experiment_name = config["output"]["experiment_name"]
+
+    # YOLO 모델 생성
+    model = YOLO(model_name)
+
+    # 모델 학습
+    model.train(
+        data=str(data_yaml),
+        epochs=epochs,
+        batch=batch_size,
+        lr0=learning_rate,
+        device=device,
+        project=output_dir,
+        name=experiment_name,
+    )
 
 
 if __name__ == "__main__":

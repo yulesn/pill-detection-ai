@@ -4,11 +4,11 @@
 data:
   raw_dir: data/raw
   processed_dir: data/processed
-  num_classes: null # TODO: 알약 클래스 개수 확정되면 채우기
+  num_classes: 56 # TODO: 알약 클래스 개수 확정되면 채우기
   max_objects_per_image: 4
 
 model:
-  name: null # TODO: 팀에서 프레임워크/모델 결정 후 채우기 (예: yolov8s, fasterrcnn_resnet50_fpn)
+  name: yolov8s.pt # TODO: 팀에서 프레임워크/모델 결정 후 채우기 (예: yolov8s, fasterrcnn_resnet50_fpn)
   pretrained: true
 
 train:
