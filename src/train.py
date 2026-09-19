@@ -2,6 +2,8 @@
 
 사용 예:
     python src/train.py --config configs/default.yaml
+    # 체크포인트에서 이어서 학습
+    python src/train.py --config configs/default.yaml --checkpoint outputs/checkpoints/default/last.pt
 """
 
 import argparse
@@ -38,6 +40,9 @@ train_transform = v2.Compose([
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/default.yaml")
+    parser.add_argument(
+        "--checkpoint", type=str, default=None, help="이어서 학습할 체크포인트(.pt) 경로"
+    )
     return parser.parse_args()
 
 
@@ -70,7 +75,7 @@ def run_epoch(model, loader, device, optimizer=None) -> float:
     return total_loss / len(loader)
 
 
-def train_torchvision(config: dict) -> None:
+def train_torchvision(config: dict, checkpoint: str | None = None) -> None:
     device = torch.device(config["train"]["device"])
     processed_dir = Path(config["data"]["processed_dir"])
 
@@ -90,6 +95,10 @@ def train_torchvision(config: dict) -> None:
     )
 
     model = build_model(config).to(device)
+    if checkpoint is not None:
+        model.load_state_dict(torch.load(checkpoint, map_location=device))
+        print(f"체크포인트에서 이어서 학습합니다: {checkpoint}")
+
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(
         params, lr=config["train"]["learning_rate"], momentum=0.9, weight_decay=0.0005
@@ -143,7 +152,7 @@ def main() -> None:
         raise NotImplementedError("YOLO 학습 루프를 구현해주세요.")
 
     if framework == "torchvision":
-        train_torchvision(config)
+        train_torchvision(config, checkpoint=args.checkpoint)
         return
 
     raise ValueError(f"지원하지 않는 framework입니다: {framework}")
