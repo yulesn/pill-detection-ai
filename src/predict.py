@@ -1,7 +1,7 @@
 """학습된 모델로 추론하는 스크립트.
 
 사용 예:
-    python src/predict.py --config configs/default.yaml --checkpoint outputs/default/checkpoints/best.pt --image path/to/image.jpg
+python src/predict.py --config configs/default.yaml --checkpoint outputs/default/checkpoints/best.pt --test_dir data/raw/sprint_ai_project1_data/test_images --output_csv outputs/predictions/submission.csv
 """
 import os
 import argparse
@@ -23,12 +23,14 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
+    data_file_path = config['data']['yaml_path']        
+    data_file = load_config(data_file_path)
     framework = config["model"]["framework"]
-
+    
     if framework == "yolo":
         model = YOLO(args.checkpoint)
-        results = model.predict(source=args.test_dir, conf=0.25, save=False)
-
+        results = model.predict(source=args.test_dir, conf=0.25, save=False, iou=0.1, max_det=4)
+        label_map = data_file['names']  # 모델 예측 결과를 데이터 제출 형식에 맞춤
         results_list = []
         annotation_counter = 1
 
@@ -36,7 +38,7 @@ def main() -> None:
             # image_id 추출
             file_name = os.path.basename(result.path) 
             image_id = os.path.splitext(file_name)[0]
-
+            
             try:
                 image_id = int(image_id)
             except ValueError:
@@ -44,7 +46,8 @@ def main() -> None:
 
             # BBox 파싱
             for box in result.boxes:
-                category_id = int(box.cls[0].item()) + 1    # tensor 객체를 가져와 int로 변환
+                category_idx = int(box.cls[0].item())    # tensor 객체를 가져와 int로 변환
+                category_id = int(label_map[category_idx].split('-')[1])
                 score = round(float(box.conf[0].item()), 3)
 
                 # xyxy -> xywh 변환
