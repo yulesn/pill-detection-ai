@@ -13,7 +13,6 @@ from torchvision.transforms import v2
 # transform=None일 때 최소한 텐서 변환은 되도록 기본값 제공
 DEFAULT_TRANSFORM = v2.Compose([
     v2.ToImage(),
-    v2.Resize((800, 610)),  # 세로 1280->800, 가로 976->610 (원본 비율 유지, 약 1.6배 축소)
     v2.ToDtype(torch.float32, scale=True),
 ])
 
@@ -121,13 +120,27 @@ class PillDataset(Dataset):
         self.data = self._load_data()
 
     def _split_img_ids(self, img_ids):
-        """subset 설정에 따라 img_id 목록을 학습/검증용으로 나눈다."""
+        """subset 설정에 따라 img_id 목록을 학습/검증용으로 나눈다.
+        같은 알약 조합(각도만 다른 사진)이 train/val에 걸쳐 섞이지 않도록,
+        조합 단위(파일명에서 각도 이전 부분)로 묶어서 나눈다."""
         if self.subset is None:
             return img_ids
-        ids = sorted(img_ids)  # 항상 같은 순서에서 출발해야 shuffle 결과가 재현됨
-        random.Random(self.split_seed).shuffle(ids)
-        n_val = max(1, int(len(ids) * self.val_ratio))
-        val_ids = set(ids[:n_val])
+
+        def combo_key(img_id):
+            file_name = self.coco.images[img_id]["file_name"]
+            return file_name.split("_0_2_0_2_")[0]
+
+        combos = {}
+        for img_id in img_ids:
+            combos.setdefault(combo_key(img_id), []).append(img_id)
+
+        combo_keys = sorted(combos.keys())
+        random.Random(self.split_seed).shuffle(combo_keys)
+        n_val_combos = max(1, int(len(combo_keys) * self.val_ratio))
+        val_combo_keys = set(combo_keys[:n_val_combos])
+
+        val_ids = {img_id for k in val_combo_keys for img_id in combos[k]}
+
         if self.subset == "val":
             return [i for i in img_ids if i in val_ids]
         elif self.subset == "train":
