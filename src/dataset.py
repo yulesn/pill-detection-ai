@@ -1,6 +1,7 @@
 """알약 검출용 PyTorch Dataset."""
 
 import json
+import random
 from pathlib import Path
 
 import torch
@@ -12,7 +13,7 @@ from torchvision.transforms import v2
 # transform=None일 때 최소한 텐서 변환은 되도록 기본값 제공
 DEFAULT_TRANSFORM = v2.Compose([
     v2.ToImage(),
-    v2.Resize((800, 610)),
+    v2.Resize((800, 610)),  # 세로 1280->800, 가로 976->610 (원본 비율 유지, 약 1.6배 축소)
     v2.ToDtype(torch.float32, scale=True),
 ])
 
@@ -77,15 +78,32 @@ class PillDataset(Dataset):
     train=True일 때, EDA에서 확인된 라벨 누락 의심 이미지
     (data/processed/excluded_images.json)는 자동으로 제외된다.
 
-    category_id(dl_idx, 원본 알약 코드)는 값의 범위가 넓어 분류기 클래스 수와
-    맞지 않으므로, 0(배경)을 제외한 1~N 사이 연속 번호로 재매핑하여 사용한다.
-    raw_id_to_label: 원본 dl_idx -> 재매핑된 라벨
-    label_to_raw_id: 재매핑된 라벨 -> 원본 dl_idx (예측 결과 해석 시 사용)
+    id(dl_idx, 원본 알약 코드)는 값의 범위가 넓어 분류기 클래스 수와
+    맞지 않으므로, 0(배경)을 제외한 1~N 사이 연속 번호(label)로 재매핑하여 사용한다.
+    raw_id_to_label: 원본 id -> 재매핑된 label
+    label_to_raw_id: 재매핑된 label -> 원본 id (예측 결과 해석 시 사용)
+
+    subset: train=True일 때만 의미 있음.
+        None(기본값) - 전체 사용 (분리 없음)
+        "train" - 학습용 부분만 (val_ratio만큼 제외)
+        "val"   - 검증용 부분만 (val_ratio만큼만)
+        같은 val_ratio/split_seed를 쓰면 "train"과 "val"은 서로 겹치지 않음.
     """
 
-    def __init__(self, data_dir: str, train: bool, transform=DEFAULT_TRANSFORM):
+    def __init__(
+        self,
+        data_dir: str,
+        train: bool,
+        transform=DEFAULT_TRANSFORM,
+        subset: str = None,
+        val_ratio: float = 0.1,
+        split_seed: int = 42,
+    ):
         self.transform = transform
         self.train = "train" if train else "test"
+        self.subset = subset
+        self.val_ratio = val_ratio
+        self.split_seed = split_seed
         data_dir = Path(data_dir)
         self.image_path = data_dir / f"{self.train}_images"
         self.categories = {}
@@ -102,6 +120,21 @@ class PillDataset(Dataset):
 
         self.data = self._load_data()
 
+    def _split_img_ids(self, img_ids):
+        """subset 설정에 따라 img_id 목록을 학습/검증용으로 나눈다."""
+        if self.subset is None:
+            return img_ids
+        ids = sorted(img_ids)  # 항상 같은 순서에서 출발해야 shuffle 결과가 재현됨
+        random.Random(self.split_seed).shuffle(ids)
+        n_val = max(1, int(len(ids) * self.val_ratio))
+        val_ids = set(ids[:n_val])
+        if self.subset == "val":
+            return [i for i in img_ids if i in val_ids]
+        elif self.subset == "train":
+            return [i for i in img_ids if i not in val_ids]
+        else:
+            raise ValueError(f"subset은 None/'train'/'val' 중 하나여야 합니다: {self.subset}")
+
     def _load_data(self):
         """데이터셋의 [(image, target)] list를 로드하는 함수."""
         data = []
@@ -110,7 +143,9 @@ class PillDataset(Dataset):
                 image = Image.open(image_file)
                 data.append((image, {}))
         elif self.train == "train":
-            for img_id, img_info in self.coco.images.items():
+            img_ids = self._split_img_ids(list(self.coco.images.keys()))
+            for img_id in img_ids:
+                img_info = self.coco.images[img_id]
                 image_file = self.image_path / img_info["file_name"]
                 image = Image.open(image_file)
                 boxes, labels = [], []
