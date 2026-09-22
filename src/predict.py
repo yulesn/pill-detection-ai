@@ -37,7 +37,6 @@ ANNOTATION_DIR = (
     / "train_annotations"
 )
 
-SUBMISSION_PATH = PROJECT_ROOT / "submission.csv"
 
 
 # ============================================================
@@ -267,7 +266,7 @@ def predict(
 # 7. Submission CSV 저장
 # ============================================================
 
-def save_submission(rows):
+def save_submission(rows, conf):
 
     fieldnames = [
         "annotation_id",
@@ -279,9 +278,11 @@ def save_submission(rows):
         "bbox_h",
         "score"
     ]
-
+    submission_path = (
+        PROJECT_ROOT / f"submission_conf{conf:.2f}.csv"
+    )
     with open(
-        SUBMISSION_PATH,
+        submission_path,
         "w",
         newline="",
         encoding="utf-8-sig"
@@ -303,7 +304,7 @@ def save_submission(rows):
                 "annotation_id": annotation_id,
                 **row
             })
-
+    return submission_path
 
 # ============================================================
 # 8. Main
@@ -377,7 +378,10 @@ def main():
     )
 
     # Submission 저장
-    save_submission(rows)
+    submission_path = save_submission(
+    rows,
+    args.conf
+    )
 
     # 결과 출력
     print("\n" + "=" * 60)
@@ -386,7 +390,7 @@ def main():
 
     print(
         "Submission:",
-        SUBMISSION_PATH
+        submission_path
     )
 
     print(
