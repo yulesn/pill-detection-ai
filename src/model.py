@@ -18,10 +18,11 @@ def build_model(config: dict):
         )
 
     if framework == "yolo":
-        # TODO(YOLO 트랙): ultralytics 모델 생성
-        # from ultralytics import YOLO
-        # return YOLO(f"{model_name}.pt")
-        raise NotImplementedError("YOLO 분기를 구현해주세요.")
+        from ultralytics import YOLO
+
+        if not model_name.endswith('.pt'):
+            model_name = f'{model_name}.pt'
+        return YOLO(model_name)
 
     if framework == "torchvision":
         # TODO(torchvision 트랙): torchvision detection 모델 생성

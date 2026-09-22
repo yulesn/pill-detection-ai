@@ -18,5 +18,5 @@ def load_config(config_path: str) -> dict:
     """configs/*.yaml 파일을 읽어서 dict로 반환한다."""
     import yaml
 
-    with open(config_path, "r") as f:
+    with open(config_path, "r", encoding='utf-8') as f:
         return yaml.safe_load(f)
