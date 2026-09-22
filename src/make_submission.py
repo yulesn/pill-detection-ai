@@ -25,10 +25,10 @@ from utils import load_config
 def get_font(size=24):
     """한글을 지원하는 시스템 폰트를 찾아서 반환한다."""
     candidates = [
-        "/System/Library/Fonts/Supplemental/AppleGothic.ttf",   # macOS
-        "/System/Library/Fonts/AppleSDGothicNeo.ttc",             # macOS 대체
-        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",        # Colab/Linux
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",   # 최후 대체(한글 미지원)
+        "/System/Library/Fonts/Supplemental/AppleGothic.ttf",  # macOS
+        "/System/Library/Fonts/AppleSDGothicNeo.ttc",  # macOS 대체
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",  # Colab/Linux
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",  # 최후 대체(한글 미지원)
     ]
     for path in candidates:
         try:
@@ -107,9 +107,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num_images", type=int, default=10, help="폴더 입력 시 처리할 이미지 개수")
     parser.add_argument("--img_size", type=int, default=512,
                         help="학습 시 사용한 리사이즈 크기 (학습 코드와 동일하게 512)")
-    # 전처리 추가
-    parser.add_argument('--use_normalization', action='store_true',
-                        help='추론 시 정규화 적용 여부')
     parser.add_argument("--score_threshold", type=float, default=0.2,
                         help="이 값 이상인 예측만 표시 (confidence threshold)")
     parser.add_argument("--iou_threshold", type=float, default=0.4,
@@ -129,13 +126,8 @@ def process_single_image(image_path, model, config, id_to_name, label_to_catid, 
 
     image = Image.open(image_path).convert("RGB")
     orig_w, orig_h = image.size
-
-
     resized_image = image.resize((args.img_size, args.img_size), Image.Resampling.BILINEAR)
     img_tensor = F.to_tensor(resized_image).to(device)
-
-    if getattr(args, 'use_normalization', False):
-        img_tensor = F.normalize(img_tensor, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     with torch.no_grad():
         prediction = model([img_tensor])[0]
@@ -176,7 +168,6 @@ def process_single_image(image_path, model, config, id_to_name, label_to_catid, 
     draw = ImageDraw.Draw(draw_image)
     font = get_font(24)
 
-    # GT - 초록색 박스 그리기
     for box, label in zip(gt_boxes, gt_labels):
         x1, y1, x2, y2 = box
         name = id_to_name.get(label) or id_to_name.get(str(label), f"Unknown_{label}")
@@ -184,10 +175,6 @@ def process_single_image(image_path, model, config, id_to_name, label_to_catid, 
         label_y = y1 - 32 if y1 - 32 > 5 else y1 + 5
         draw_label(draw, (x1, label_y), f"GT: {name}", "green", font, orig_w)
 
-    for box, score, label in zip(valid_boxes, valid_scores, valid_labels):
-        x1, y1, x2, y2 = box.tolist()
-
-    # 예측 - 빨간색 박스 그리기
     for box, score, label in zip(valid_boxes, valid_scores, valid_labels):
         x1, y1, x2, y2 = box.tolist()
         model_label = int(label.item())

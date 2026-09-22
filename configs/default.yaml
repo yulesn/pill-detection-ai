@@ -4,21 +4,22 @@
 data:
   raw_dir: data/raw
   processed_dir: data/processed
-  num_classes: null # TODO: 알약 클래스 개수 확정되면 채우기
+  num_classes: 57 # TODO: 알약 클래스 개수 확정되면 채우기 (56 + 배경 포함 1 = 57)
   max_objects_per_image: 4
 
 model:
-  framework: null # TODO: yolo 또는 torchvision 중 팀에서 채택한 트랙으로 채우기
-  name: null # TODO: 팀에서 프레임워크/모델 결정 후 채우기 (예: yolov8s, fasterrcnn_resnet50_fpn)
+  framework: torchvision # TODO: yolo 또는 torchvision 중 팀에서 채택한 트랙으로 채우기
+  name: retinanet_resnet50_fpn_v2 # TODO: 팀에서 프레임워크/모델 결정 후 채우기 (예: yolov8s, fasterrcnn_resnet50_fpn)
   pretrained: true
 
 train:
-  epochs: 50
-  batch_size: 16
+  epochs: 100
+  batch_size: 8
   learning_rate: 0.001
   seed: 42
-  device: cpu # 학습 서버에서는 cuda로 변경
+  device: mps # 학습 서버에서는 cuda로 변경
 
 output:
+
   dir: outputs
   experiment_name: default
