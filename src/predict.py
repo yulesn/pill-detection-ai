@@ -39,6 +39,36 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def run_inference(
+    model,
+    image_tensor: torch.Tensor,
+    device,
+    score_threshold: float,
+    max_objects_per_image: int,
+    nms_iou_threshold: float = 0.5,
+):
+    """이미지 텐서 한 장에 대해 (boxes, labels, scores)를 반환한다.
+
+    labels는 모델이 직접 예측하는 라벨(1-index, category_mapping.json 기준)
+    그대로이며, 원본 category_id로의 변환은 호출부 책임이다 — 제출용 CSV는
+    변환이 필요하지만, val GT(annotations.json)와 비교하는 평가에서는
+    라벨 공간이 이미 같으므로 변환하면 안 된다.
+    """
+    with torch.no_grad():
+        output = model([image_tensor.to(device)])[0]
+
+    boxes, labels, scores = output["boxes"], output["labels"], output["scores"]
+    keep = scores >= score_threshold
+    boxes, labels, scores = boxes[keep], labels[keep], scores[keep]
+
+    # torchvision 모델의 NMS는 클래스별로만 적용되어, 같은 물체를 다른 카테고리로
+    # 예측해 겹치는 박스가 남을 수 있다. 클래스 무관 NMS를 한 번 더 적용해서 걸러낸다.
+    # nms()는 살아남은 인덱스를 score 내림차순으로 반환하므로, 이어서 상위
+    # max_objects_per_image개만 자르면 이미지당 최대 알약 개수 제한도 함께 적용된다.
+    keep = torchvision.ops.nms(boxes, scores, nms_iou_threshold)[:max_objects_per_image]
+    return boxes[keep], labels[keep], scores[keep]
+
+
 def predict_image(
     model,
     image_path: Path,
@@ -52,21 +82,11 @@ def predict_image(
     image_id = int(image_path.stem)
 
     image = Image.open(image_path).convert("RGB")
-    input_tensor = DEFAULT_TRANSFORM(image).to(device)
+    input_tensor = DEFAULT_TRANSFORM(image)
 
-    with torch.no_grad():
-        output = model([input_tensor])[0]
-
-    boxes, labels, scores = output["boxes"], output["labels"], output["scores"]
-    keep = scores >= score_threshold
-    boxes, labels, scores = boxes[keep], labels[keep], scores[keep]
-
-    # torchvision 모델의 NMS는 클래스별로만 적용되어, 같은 물체를 다른 카테고리로
-    # 예측해 겹치는 박스가 남을 수 있다. 클래스 무관 NMS를 한 번 더 적용해서 걸러낸다.
-    # nms()는 살아남은 인덱스를 score 내림차순으로 반환하므로, 이어서 상위
-    # max_objects_per_image개만 자르면 이미지당 최대 알약 개수 제한도 함께 적용된다.
-    keep = torchvision.ops.nms(boxes, scores, nms_iou_threshold)[:max_objects_per_image]
-    boxes, labels, scores = boxes[keep], labels[keep], scores[keep]
+    boxes, labels, scores = run_inference(
+        model, input_tensor, device, score_threshold, max_objects_per_image, nms_iou_threshold
+    )
 
     results = []
     for box, label, score in zip(boxes, labels, scores):
