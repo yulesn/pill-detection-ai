@@ -18,7 +18,7 @@ from pycocotools.cocoeval import COCOeval
 
 from dataset import PillDataset
 from model import build_model
-from utils import load_config, set_seed
+from utils import load_config, load_model_weights, set_seed
 
 
 train_transform = v2.Compose([
@@ -96,7 +96,7 @@ def train_torchvision(config: dict, checkpoint: str | None = None) -> None:
 
     model = build_model(config).to(device)
     if checkpoint is not None:
-        model.load_state_dict(torch.load(checkpoint, map_location=device))
+        load_model_weights(model, checkpoint, device)
         print(f"체크포인트에서 이어서 학습합니다: {checkpoint}")
 
     params = [p for p in model.parameters() if p.requires_grad]

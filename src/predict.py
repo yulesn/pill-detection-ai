@@ -20,7 +20,7 @@ from PIL import Image
 
 from dataset import DEFAULT_TRANSFORM
 from model import build_model
-from utils import load_config
+from utils import load_config, load_model_weights
 
 
 def load_label_to_category_id(processed_dir: Path) -> dict[int, int]:
@@ -115,7 +115,7 @@ def predict_torchvision(
     max_objects_per_image: int,
     label_to_category_id: dict[int, int],
 ) -> list[dict]:
-    model.load_state_dict(torch.load(checkpoint, map_location=device))
+    load_model_weights(model, checkpoint, device)
     model.to(device)
     model.eval()
 
