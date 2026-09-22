@@ -35,3 +35,12 @@ venv/
 .DS_Store
 .vscode/
 .idea/
+
+# AI Hub 외부 데이터 (용량 문제로 git 제외, .gitkeep으로 폴더 구조만 유지)
+!data/raw/aihub_pill/
+!data/raw/aihub_pill/train_images/
+!data/raw/aihub_pill/train_annotations/
+data/raw/aihub_pill/train_images/*
+data/raw/aihub_pill/train_annotations/*
+!data/raw/aihub_pill/train_images/.gitkeep
+!data/raw/aihub_pill/train_annotations/.gitkeep
