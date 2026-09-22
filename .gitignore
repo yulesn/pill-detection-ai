@@ -6,6 +6,7 @@ data/processed/*
 outputs/*
 !outputs/checkpoints
 !outputs/checkpoints/.gitkeep
+!outputs/predictions
 !outputs/predictions/.gitkeep
 
 # Model weights
