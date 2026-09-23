@@ -24,14 +24,28 @@ def main() -> None:
     framework = config["model"]["framework"]
 
     if framework == "yolo":
-        # TODO(YOLO 트랙): ultralytics가 학습 루프를 자체 제공하므로 커스텀 루프 불필요
-        # model = build_model(config)
-        # model.train(
-        #     data="data/processed/yolo/data.yaml",
-        #     epochs=config["train"]["epochs"],
-        #     batch=config["train"]["batch_size"],
-        # )
-        raise NotImplementedError("YOLO 학습 루프를 구현해주세요.")
+        data_yaml = config["data"]["yaml_path"]
+        epochs = config["train"]["epochs"]
+        batch_size = config["train"]["batch_size"]
+        device = config["train"]["device"]
+
+        output_dir = config["output"]["dir"]
+        exp_name = config["output"]["experiment_name"]
+
+        model = build_model(config)
+
+        results = model.train(
+            data=data_yaml,
+            epochs=epochs,
+            batch=batch_size,
+            device=device,
+            project=output_dir,
+            name=exp_name,
+            seed=config["train"]["seed"],
+            save=True,
+        )
+        print(f"YOLO 학습 완료! 결과 저장 위치: {results.save_dir}")
+        return
 
     if framework == "torchvision":
         # TODO(torchvision 트랙): PillDataset으로 train/val DataLoader 구성,
