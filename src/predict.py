@@ -8,7 +8,6 @@ import argparse
 import pandas as pd
 from ultralytics import YOLO
 
-from model import build_model
 from utils import load_config
 
 

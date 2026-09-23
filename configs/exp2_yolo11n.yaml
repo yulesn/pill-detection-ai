@@ -4,7 +4,7 @@
 data:
   raw_dir: data/raw
   processed_dir: data/processed
-  yaml_path: configs/data.yaml
+  yaml_path: data/processed/yolo/data.yaml
   num_classes: 56
   max_objects_per_image: 4
 
