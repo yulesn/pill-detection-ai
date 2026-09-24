@@ -21,3 +21,4 @@ dependencies:
       - pycocotools==2.0.8
       - ultralytics==8.3.0 # YOLO 계열 선택 시 사용. torchvision만 쓰기로 하면 제거해도 됨
       - kagglehub==0.3.4 # data/README.md 참고 — Kaggle 대회 데이터 다운로드용
+      - python-dotenv==1.2.3

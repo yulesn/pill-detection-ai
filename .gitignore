@@ -7,6 +7,7 @@ outputs/*
 !outputs/checkpoints
 !outputs/checkpoints/.gitkeep
 !outputs/predictions/.gitkeep
+data/augmented/*
 
 # Model weights
 *.pt
@@ -34,3 +35,10 @@ venv/
 .DS_Store
 .vscode/
 .idea/
+
+# Environment variables / API Keys
+*.env
+
+# AI Hub CLI Tools
+aihubshell
+aihubhsell.exe
