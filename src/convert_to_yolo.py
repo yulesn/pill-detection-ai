@@ -1,66 +1,55 @@
-import matplotlib.pyplot as plt 
+import matplotlib.pyplot as plt
 
 import json
-import glob
-import cv2
-import os
 import shutil
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 from PIL import Image
 from collections import Counter
 import pandas as pd
+import cv2
 from ultralytics import YOLO
 from sklearn.model_selection import train_test_split
 import yaml
-    
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
-def load_data(path):
-    train_image_path = os.path.join(path, 'train_images')
-    train_ann_path = os.path.join(path, 'train_annotations')
-    test_image_path = os.path.join(path, 'test_images')
+def load_data(path: Path):
+    train_image_path = path / 'train_images'
+    train_ann_path = path / 'train_annotations'
+    test_image_path = path / 'test_images'
 
-    train_images = [obj for obj in os.listdir(train_image_path) if obj.endswith(('png','jpg','jpeg'))]
-    test_images = [obj for obj in os.listdir(test_image_path) if obj.endswith(('png','jpg','jpeg'))]
-    train_anns = []
-    for root, dirs, files in os.walk(train_ann_path):
-        for file in files:
-            if file.endswith('.json'):
-                train_anns.append(file)
-    # 정렬
-    train_images = sorted(train_images)
-    train_anns = sorted(train_anns)
-    test_images = sorted(test_images)
+    train_images = sorted(p.name for p in train_image_path.iterdir() if p.name.endswith(('png', 'jpg', 'jpeg')))
+    test_images = sorted(p.name for p in test_image_path.iterdir() if p.name.endswith(('png', 'jpg', 'jpeg')))
+    train_anns = sorted(p.name for p in train_ann_path.rglob('*.json'))
 
     return train_image_path, train_ann_path, test_image_path,\
            train_images, train_anns, test_images
 
 
-def define_mapping_dict(train_images, train_image_path, train_ann_path):
+def define_mapping_dict(train_images, train_image_path: Path, train_ann_path: Path):
     '''
     {알약 종류:idx} 형태의 mapping dict 생성
     '''
     label_list = []
 
     for image in train_images:
-        image_path = os.path.join(train_image_path, image)
-        image_name = os.path.splitext(os.path.basename(image_path))[0]
+        image_name = Path(image).stem
         # 이미지 파일명에서 조합 ID 추출
         group_id = image_name.split('_')[0]
-        dir_name = f'{group_id}_json'
+        ann_path = train_ann_path / f'{group_id}_json'
+        for ann_dir in ann_path.iterdir():
+            label_list.append(ann_dir.name)
 
-        ann_path = os.path.join(train_ann_path, dir_name)
-        for ann_dir in os.listdir(ann_path):
-            label_list.append(ann_dir)
+    label_list = sorted(set(label_list))
+    label_map = {label: idx for idx, label in enumerate(label_list)}
 
-    label_list = sorted(list(set(label_list)))
-    label_map = {label:idx for idx, label in enumerate(label_list)}
-
-    return label_map        
+    return label_map
 
 
-def get_image_informations(train_images, annotation_path) -> list:
+def get_image_informations(train_images, annotation_path: Path) -> list:
     '''
     image_informations = [
     {'image': image_name, 'bboxes': boxes, 'labels': labels, 'image_size':image_size},
@@ -71,12 +60,11 @@ def get_image_informations(train_images, annotation_path) -> list:
     image_informations = []
 
     for image in train_images:
-        image_name = image.split('.')[0]
+        image_name = Path(image).stem
         # 이미지 파일명에서 조합 ID 추출
         group_id = image_name.split('_')[0]
         folder_name = f'{group_id}_json'
-        search_path = os.path.join(annotation_path, folder_name, '*', f'{image_name}.json')
-        matched_json_files = glob.glob(search_path)
+        matched_json_files = list(annotation_path.glob(f'{folder_name}/*/{image_name}.json'))
 
         boxes = []
         labels = []
@@ -100,10 +88,10 @@ def is_match_image_and_ann(image_informations):
         group_id = image_info['image'].split('_')[0]
         ann_folder_name = f'{group_id}_json'
         # 폴더명에 포함된 알약의 개수가 추출된 bbox의 개수와 같은지 확인
-        if len(ann_folder_name.split('-')[1:]) != len(image_info['bboxes']):    
+        if len(ann_folder_name.split('-')[1:]) != len(image_info['bboxes']):
             unmatch_pill_ann_images.append(image_info['image'])
 
-    return unmatch_pill_ann_images 
+    return unmatch_pill_ann_images
 
 def compute_iou(box1, box2):
     x1, y1, w1, h1 = box1
@@ -136,19 +124,19 @@ def verify_bbox(image_informations):
 
         # 2. 겹치는 Bounding Box가 있는지 확인(IOU > 0.5)
         bboxes = image_info['bboxes']
-        IOU_THRESHOLD = 0.5  
+        IOU_THRESHOLD = 0.5
         for i in range(len(bboxes)):
             for j in range(i+1, len(bboxes)):
                 iou = compute_iou(tuple(bboxes[i]), tuple(bboxes[j]))
                 if iou >= IOU_THRESHOLD:
                     overlaped_images.append(image_info['image'])
 
-    return bbox_out_of_bounds_images, overlaped_images                   
+    return bbox_out_of_bounds_images, overlaped_images
 
 
 
-def visualize_corrupted_images(train_image_path, image_informations):
-    unmatch_pill_ann_images = is_match_image_and_ann(image_informations)  
+def visualize_corrupted_images(train_image_path: Path, image_informations):
+    unmatch_pill_ann_images = is_match_image_and_ann(image_informations)
     bbox_out_of_bounds_images, overlaped_images = verify_bbox(image_informations)
     corrupted_images = unmatch_pill_ann_images + bbox_out_of_bounds_images + overlaped_images
     corrupted_images = list(set(corrupted_images))  # 중복제거
@@ -156,10 +144,10 @@ def visualize_corrupted_images(train_image_path, image_informations):
 
     # 시각화
     fig, axes = plt.subplots(1, len(corrupted_images), figsize=(5,5))
-    
+
     for idx, img_info in enumerate(corrupted_image_informations):
-        img_path = os.path.join(train_image_path, f'{img_info["image"]}.png')
-        img = cv2.imread(img_path)
+        img_path = train_image_path / f'{img_info["image"]}.png'
+        img = cv2.imread(str(img_path))
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         #bbox
         box_color = (0, 255, 0)
@@ -182,14 +170,14 @@ def visualize_corrupted_images(train_image_path, image_informations):
 
             # 텍스트 가독성을 위한 배경 상자
             cv2.rectangle(img_rgb, (x_min, y_min - text_h - 10), (x_min + text_w, y_min), box_color, -1)
-            cv2.putText(img_rgb, text, (x_min, y_min-5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color, 2)        
+            cv2.putText(img_rgb, text, (x_min, y_min-5), cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color, 2)
 
         axes[idx].imshow(img_rgb)
 
     plt.axis('off')
     plt.tight_layout()
     plt.show()
-        
+
 
 def verify_and_delete_corrupted_images(image_informations):
     '''오염된 이미지 삭제'''
@@ -209,20 +197,20 @@ def verify_and_delete_corrupted_images(image_informations):
     return verified_image_informations
 
 
-def convert_ann_file_to_txt(project_path, image_informations, label_map) -> None:
+def convert_ann_file_to_txt(project_path: Path, image_informations, label_map) -> None:
     '''
-    data/processed/train_val_labels/
+    data/processed/yolo/train_val_labels/
     image_name.txt
     class_id    x_center    y_center    norm_w  norm_h
     class_id    x_center    y_center    norm_w  norm_h
     ...
 
     '''
-    ann_path = os.path.join(project_path, 'data/processed/train_val_labels')
-    os.makedirs(ann_path, exist_ok=True)
+    ann_path = project_path / 'data/processed/yolo/train_val_labels'
+    ann_path.mkdir(parents=True, exist_ok=True)
 
     for image_info in image_informations:
-    
+
         ann_lines = []  # text파일에 들어갈 라인
         image_name = image_info['image']
         image_w, image_h = image_info['image_size']
@@ -231,86 +219,87 @@ def convert_ann_file_to_txt(project_path, image_informations, label_map) -> None
             class_id = label_map[label]
             x_min, y_min, w, h = bbox
             # Normalization
-            x_center = (x_min + (w/2)) / image_w    
+            x_center = (x_min + (w/2)) / image_w
             y_center = (y_min + (h/2)) / image_h
             norm_w = w / image_w
             norm_h = h / image_h
 
             ann_lines.append(f'{class_id} {x_center:.6f} {y_center:.6f} {norm_w:.6f} {norm_h:.6f}')
 
-        with open(f'{os.path.join(ann_path, image_name)}.txt', 'w') as f:
-            f.write('\n'.join(ann_lines))
+        (ann_path / f'{image_name}.txt').write_text('\n'.join(ann_lines))
 
 
-def move_files(image_dir, ann_dir, save_dir, image_list, split_type):
+def move_files(image_dir: Path, ann_dir: Path, save_dir: Path, image_list, split_type):
     '''
     이미지, 라벨을 원본 폴더에서 전처리 폴더로 이동
     '''
     for img_name in image_list:
-        ann_name = f'{os.path.splitext(img_name)[0]}.txt'
+        ann_name = f'{Path(img_name).stem}.txt'
 
         # 이미지 이동
-        src_img = os.path.join(image_dir, img_name)
-        dst_img = os.path.join(save_dir, split_type, 'images', img_name)
+        src_img = image_dir / img_name
+        dst_img = save_dir / split_type / 'images' / img_name
 
         # 라벨 이동
-        src_label = os.path.join(ann_dir, ann_name)
-        dst_label = os.path.join(save_dir, split_type, 'labels', ann_name)
-        
-        os.makedirs(os.path.dirname(dst_img), exist_ok=True)
-        os.makedirs(os.path.dirname(dst_label), exist_ok=True)
+        src_label = ann_dir / ann_name
+        dst_label = save_dir / split_type / 'labels' / ann_name
+
+        dst_img.parent.mkdir(parents=True, exist_ok=True)
+        dst_label.parent.mkdir(parents=True, exist_ok=True)
 
         shutil.copy(src_img, dst_img)
         shutil.copy(src_label, dst_label)
-        
-def split_data(project_path, image_informations):
+
+def split_data(project_path: Path, image_informations):
     '''
     train과 validation용 데이터 분리
-    dir구조:  
-        data/processed/
+    dir구조:
+        data/processed/yolo/
     ├── train/
     │   ├── images/   # image1.jpg, image2.jpg ...
-    │   └── labels/   # image1.txt, image2.txt ... 
+    │   └── labels/   # image1.txt, image2.txt ...
     └── val/
         ├── images/
         └── labels/
     '''
-    image_dir = os.path.join(project_path, 'data/raw/sprint_ai_project1_data/train_images')
-    save_dir = os.path.join(project_path, 'data/processed')
-    ann_dir = os.path.join(save_dir, 'train_val_labels')
+    image_dir = project_path / 'data/raw/sprint_ai_project1_data/train_images'
+    save_dir = project_path / 'data/processed/yolo'
+    ann_dir = save_dir / 'train_val_labels'
     all_images = [f'{img_info["image"]}.png' for img_info in image_informations]
 
     train_images, val_images = train_test_split(all_images, test_size=0.2, random_state=42)
     # 파일 복사
     move_files(image_dir, ann_dir, save_dir, train_images, 'train')
     move_files(image_dir, ann_dir, save_dir, val_images, 'val')
-    
-def save_data_yaml(label_map):
-    '''configs/data.yaml파일 생성'''
+
+def save_data_yaml(label_map, project_path: Path):
+    '''YOLO 학습용 data/processed/yolo/data.yaml파일 생성'''
     names_dict = {idx:code for code, idx in label_map.items()}
 
     yaml_data = {
-        'path': 'data/processed',
+        'path': 'data/processed/yolo',
         'train': 'train/images',
         'val': 'val/images',
         'nc': len(names_dict),
         'names': names_dict
     }
 
-    with open('configs/data.yaml', 'w', encoding='utf-8') as f:
+    save_path = project_path / 'data/processed/yolo/data.yaml'
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(save_path, 'w', encoding='utf-8') as f:
         yaml.dump(yaml_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
 
 def main() -> None:
-    my_project_path = 'c://Bootcamp/project/pill-detection-ai' # 내 local 환경 절대경로
-    data_path = os.path.join(my_project_path, 'data/raw/sprint_ai_project1_data')
+    project_path = PROJECT_ROOT
+    data_path = project_path / 'data/raw/sprint_ai_project1_data'
 
     # 데이터 로드
     train_image_path, train_ann_path, test_image_path,\
     train_images, train_anns, test_images = load_data(data_path)
     # annotation용 mapping_dict 정의
-    label_map = define_mapping_dict(train_images, train_image_path, train_ann_path)    
+    label_map = define_mapping_dict(train_images, train_image_path, train_ann_path)
     # 이미지 정보 추출
     image_informations = get_image_informations(train_images, train_ann_path)
     # # 오염된 이미지 시각화
@@ -318,11 +307,11 @@ def main() -> None:
     # 데이터 검증 후 삭제
     verified_image_informations = verify_and_delete_corrupted_images(image_informations)
     # annotation.txt파일 생성
-    convert_ann_file_to_txt(my_project_path, verified_image_informations, label_map)
+    convert_ann_file_to_txt(project_path, verified_image_informations, label_map)
     # train과 validation 데이터 분리 후 저장
-    split_data(my_project_path, verified_image_informations)
+    split_data(project_path, verified_image_informations)
     # 데이터 정보를 data_yaml 파일로 저장
-    save_data_yaml(label_map)
+    save_data_yaml(label_map, project_path)
 
 if __name__ == '__main__':
     main()

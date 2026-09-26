@@ -100,7 +100,7 @@ def define_mapping_dict(annotation_path):
     label_map = {drug_N:idx for idx,drug_N in enumerate(unique_drug_N)}
     return annotations, label_map 
 # ====================================================================================
-# 데이터 오류 검출
+# 데이터 전처리
 # ====================================================================================
 
 def delete_unmatched_ann(annotations):
@@ -165,6 +165,22 @@ def verify_bbox(annotations):
 
     return parsed_anns
 
+def is_exist_image(data_path, annotations):
+    '''annotations['file_name'] 이미지가 실제로 존재하는지 확인하는 함수'''
+    image_path = data_path / 'images'
+    exist_images = set(img_f.name for img_f in image_path.rglob('*.png'))
+    print(f'이미지 개수: {len(exist_images)}')
+    error_images = [img_f for img_f in annotations['file_name'] if img_f not in exist_images]
+    print(f'annotation의 이미지가 실제로 존재하지 않는 경우: {len(error_images)}')
+    # 삭제
+    parsed_anns = annotations[~annotations['file_name'].isin(error_images)]
+
+    return parsed_anns
+
+# ====================================================================================
+# 파일 생성
+# ====================================================================================
+
 
 def convert_ann_to_txt(data_path, annotations, label_map) -> None:
     '''
@@ -175,7 +191,7 @@ def convert_ann_to_txt(data_path, annotations, label_map) -> None:
     ...
 
     '''
-    ann_path = Path(data_path) / 'train_val_anns' 
+    ann_path = data_path / 'train_val_anns' 
 
     if ann_path.exists() == True:   # 폴더가 이미 존재하는 경우 삭제 후 재생성
         shutil.rmtree(ann_path)
@@ -200,19 +216,7 @@ def convert_ann_to_txt(data_path, annotations, label_map) -> None:
 
         with open(f'{os.path.join(ann_path, image_name)}.txt', 'w') as f:
             f.write('\n'.join(ann_lines))
-
-def is_exist_image(data_path, annotations):
-    '''annotations['file_name'] 이미지가 실제로 존재하는지 확인하는 함수'''
-    image_path = Path(data_path) / 'images'
-    exist_images = {img_f.name for img_f in image_path.rglob('*.png')}
-
-    error_images = [img_f for img_f in annotations['file_name'] if img_f not in exist_images]
-
-    print(f'annotation의 이미지가 실제로 존재하지 않는 경우: {len(error_images)}')
-    # 삭제
-    parsed_anns = annotations[~annotations['file_name'].isin(error_images)]
-
-    return parsed_anns
+    print(f'annotation 파일 {len(list(ann_path.rglob("*.txt")))}개 저장 성공!')
 
 
 def move_files(image_dir, ann_dir, save_dir, image_list, split_type):
@@ -229,14 +233,18 @@ def move_files(image_dir, ann_dir, save_dir, image_list, split_type):
         # 라벨 이동
         src_label = os.path.join(ann_dir, ann_name)
         dst_label = os.path.join(save_dir, split_type, 'labels', ann_name)
-        
-        os.makedirs(os.path.dirname(dst_img), exist_ok=True)
-        os.makedirs(os.path.dirname(dst_label), exist_ok=True)
+        try:
+            os.makedirs(os.path.dirname(dst_img), exist_ok=True)
+            os.makedirs(os.path.dirname(dst_label), exist_ok=True)
 
-        shutil.copy(src_img, dst_img)
-        shutil.copy(src_label, dst_label)
-        
-def split_data(data_path, annotations):
+            shutil.move(src_img, dst_img)
+            shutil.move(src_label, dst_label)
+        except Exception:
+            continue
+
+    
+
+def split_data(project_path, data_path, annotations):
     '''
     train과 validation용 데이터 분리
     dir구조:  
@@ -248,9 +256,9 @@ def split_data(data_path, annotations):
         ├── images/
         └── labels/
     '''
-    image_dir = Path(data_path) / 'images'
-    save_dir = Path(data_path) / 'processed'
-    ann_dir = Path(data_path) / 'train_val_anns'
+    image_dir = data_path / 'images'
+    ann_dir = data_path / 'train_val_anns'
+    save_dir = project_path / 'data' / 'augmented' / 'processed'
     all_images = annotations['file_name'].unique().tolist()
 
     train_images, val_images = train_test_split(all_images, test_size=0.2, random_state=42)
@@ -258,10 +266,17 @@ def split_data(data_path, annotations):
     # 폴더가 이미 존재할 경우 삭제 후 재생성
     if save_dir.exists():
         shutil.rmtree(save_dir)
-        
+
     # 파일 복사
     move_files(image_dir, ann_dir, save_dir, train_images, 'train')
     move_files(image_dir, ann_dir, save_dir, val_images, 'val')
+
+    # 검증
+    train_img_path = save_dir / 'train' / 'images'
+    val_img_path = save_dir / 'val' / 'images'
+    print(f'train 데이터 개수{len(list(train_img_path.rglob("*.png")))}')
+    print(f'val 데이터 개수{len(list(val_img_path.rglob("*.png")))}')
+
     
 def save_data_yaml(label_map):
     '''configs/data.yaml파일 생성'''
@@ -281,9 +296,9 @@ def save_data_yaml(label_map):
 
 
 def main() -> None:
-    PROJECT_PATH = 'c://Bootcamp/project/pill-detection-ai' # 내 local 환경 절대경로
-    DATA_PATH = 'G://내 드라이브/colab_notebooks/project/pill_detection_ai/data/augmented'
-    ANNOTATION_PATH = Path(__file__).resolve().parent.parent / 'data' / 'augmented' / 'annotations.pkl'
+    PROJECT_PATH = Path(__file__).resolve().parent.parent
+    DATA_PATH = PROJECT_PATH / 'data' / 'augmented' / 'raw'
+    ANNOTATION_PATH = PROJECT_PATH / 'data' / 'augmented' / 'annotations.pkl'
 
     # 데이터 로드(최초 1회)
     # load_annotations(DATA_PATH, ANNOTATION_PATH)
@@ -294,15 +309,15 @@ def main() -> None:
     # 알약의 개수와 bbox 개수가 일치하지 않는 행 삭제
     parsed_annotations = delete_unmatched_ann(annotations)
     # Bbox 오류 이미지 삭제
-    parsed_annotations = verify_bbox(parsed_annotations)
+    parsed_annotations_2 = verify_bbox(parsed_annotations)
     # 실제로 이미지가 존재하지 않는 경우 삭제
-    preprocessed_annotations = is_exist_image(DATA_PATH, parsed_annotations)
+    preprocessed_annotations = is_exist_image(DATA_PATH, parsed_annotations_2)
 
     # annotation .txt형태로 저장(최초 1회)   
-    # convert_ann_to_txt(DATA_PATH, preprocessed_annotations, label_map)
+    convert_ann_to_txt(DATA_PATH, preprocessed_annotations, label_map)
 
     # train/val 데이터 스플릿
-    split_data(DATA_PATH, preprocessed_annotations)    
+    split_data(PROJECT_PATH, DATA_PATH, preprocessed_annotations)    
     # 데이터 정보를 data_yaml 파일로 저장
     save_data_yaml(label_map)
 

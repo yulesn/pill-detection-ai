@@ -1,6 +1,7 @@
 # Data & outputs (large / generated, not tracked)
 data/raw/*
 data/processed/*
+data/augmented/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 outputs/*
@@ -42,3 +43,4 @@ venv/
 # AI Hub CLI Tools
 aihubshell
 aihubhsell.exe
+

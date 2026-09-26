@@ -1,10 +1,10 @@
-# batch_size 8
-# epoch: 100
+# batch_size 16 -> 8
+# epoch: 50 -> 100
 
 data:
   raw_dir: data/raw
   processed_dir: data/processed
-  yaml_path: configs/data.yaml
+  yaml_path: data/processed/yolo/data.yaml
   num_classes: 56
   max_objects_per_image: 4
 

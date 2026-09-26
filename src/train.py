@@ -5,7 +5,6 @@
 """
 
 import argparse
-from ultralytics import YOLO
 
 from dataset import PillDataset
 from model import build_model
@@ -25,7 +24,6 @@ def main() -> None:
     framework = config["model"]["framework"]
 
     if framework == "yolo":
-        model_name = config["model"]["name"]
         data_yaml = config["data"]["yaml_path"]
         epochs = config["train"]["epochs"]
         batch_size = config["train"]["batch_size"]
@@ -34,7 +32,7 @@ def main() -> None:
         output_dir = config["output"]["dir"]
         exp_name = config["output"]["experiment_name"]
 
-        model = YOLO(model_name)
+        model = build_model(config)
 
         results = model.train(
             data=data_yaml,
