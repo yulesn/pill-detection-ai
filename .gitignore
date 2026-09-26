@@ -1,6 +1,7 @@
 # Data & outputs (large / generated, not tracked)
 data/raw/*
 data/processed/*
+data/augmented/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 outputs/*
@@ -8,6 +9,7 @@ outputs/*
 !outputs/checkpoints/.gitkeep
 !outputs/predictions
 !outputs/predictions/.gitkeep
+data/augmented/*
 
 # Model weights
 *.pt
@@ -35,3 +37,11 @@ venv/
 .DS_Store
 .vscode/
 .idea/
+
+# Environment variables / API Keys
+*.env
+
+# AI Hub CLI Tools
+aihubshell
+aihubhsell.exe
+
