@@ -32,4 +32,30 @@ def build_model(config: dict):
         # )
         raise NotImplementedError("torchvision 분기를 구현해주세요.")
 
+    if framework == "rfdetr":
+        from rfdetr import RFDETRLarge, RFDETRMedium, RFDETRNano, RFDETRSmall
+
+        rfdetr_classes = {
+            "rfdetr_nano": RFDETRNano,
+            "rfdetr_small": RFDETRSmall,
+            "rfdetr_medium": RFDETRMedium,
+            "rfdetr_large": RFDETRLarge,
+        }
+        if model_name not in rfdetr_classes:
+            raise ValueError(
+                f"지원하지 않는 rfdetr 모델입니다: {model_name}. "
+                f"사용 가능: {list(rfdetr_classes)}"
+            )
+
+        kwargs = {"num_classes": config["data"]["num_classes"]}
+        device = config.get("train", {}).get("device")
+        if device:
+            kwargs["device"] = device
+        checkpoint = config["model"].get("checkpoint")
+        if checkpoint:
+            # 학습된 체크포인트로 추론할 때(predict.py)는 pretrain_weights에
+            # 체크포인트 경로를 넘겨서 그 가중치로 초기화한다.
+            kwargs["pretrain_weights"] = checkpoint
+        return rfdetr_classes[model_name](**kwargs)
+
     raise ValueError(f"지원하지 않는 framework입니다: {framework}")

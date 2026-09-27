@@ -1,0 +1,26 @@
+# RF-DETR 트랙 실험 설정.
+# 학습 전에 `python src/convert_to_rfdetr.py`로 data/processed/rfdetr/{train,valid}를 만들어야 한다.
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  rfdetr_dir: data/processed/rfdetr # convert_to_rfdetr.py가 생성하는 train/valid 디렉터리
+  num_classes: 56
+  max_objects_per_image: 4
+
+model:
+  framework: rfdetr
+  name: rfdetr_nano # rfdetr_nano / rfdetr_small / rfdetr_medium / rfdetr_large
+  pretrained: true
+  checkpoint: null # predict.py 실행 시 --checkpoint 값이 여기에 채워짐
+
+train:
+  epochs: 10
+  batch_size: 8
+  learning_rate: 0.0001
+  seed: 42
+  device: cpu # 학습 서버에서는 cuda로 변경
+
+output:
+  dir: outputs
+  experiment_name: rfdetr_nano

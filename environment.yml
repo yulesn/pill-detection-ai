@@ -5,19 +5,24 @@ channels:
   - defaults
 dependencies:
   - python=3.11
-  - pytorch=2.4.1
-  - torchvision=0.19.1
-  - torchaudio=2.4.1
+  - pytorch=2.5.1
+  - torchvision=0.20.1
+  - torchaudio=2.5.1
+  - jpeg # torchvision 0.20.1의 네이티브 이미지 디코더(torchvision.io)가 libjpeg를 찾음
+  - libpng
   - pip=24.2
   - pip:
       - opencv-python==4.10.0.84
-      - numpy==1.26.4
+      - numpy==1.26.4 # pytorch=2.5.1이 conda로 numpy 2.x를 끌고 올 수 있어서 명시적으로 다시 고정 (ultralytics는 numpy<2.0 요구)
       - pandas==2.2.2
       - matplotlib==3.9.2
       - pyyaml==6.0.2
       - tqdm==4.66.5
       - scikit-learn==1.5.2
-      - albumentations==1.4.15
+      - albumentations==1.4.24
       - pycocotools==2.0.8
       - ultralytics==8.3.0 # YOLO 계열 선택 시 사용. torchvision만 쓰기로 하면 제거해도 됨
       - kagglehub==0.3.4 # data/README.md 참고 — Kaggle 대회 데이터 다운로드용
+      # RF-DETR 트랙 선택 시 사용. [train] extra가 학습에 필요한 pytorch-lightning/torchmetrics를 같이 설치함
+      - rfdetr[train]==1.11.0
+      - transformers==5.17.0

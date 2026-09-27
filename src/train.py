@@ -53,6 +53,21 @@ def main() -> None:
         # config["output"]["dir"]/config["output"]["experiment_name"] 아래에 체크포인트 저장
         raise NotImplementedError("torchvision 학습 루프를 구현해주세요.")
 
+    if framework == "rfdetr":
+        # 학습 전에 `python src/convert_to_rfdetr.py`로
+        # data/processed/rfdetr/{train,valid}를 만들어둬야 한다.
+        model = build_model(config)
+        model.train(
+            dataset_dir=config["data"]["rfdetr_dir"],
+            epochs=config["train"]["epochs"],
+            batch_size=config["train"]["batch_size"],
+            lr=config["train"]["learning_rate"],
+            output_dir=f"{config['output']['dir']}/{config['output']['experiment_name']}",
+            run_test=False,
+            device=config["train"]["device"],
+        )
+        return
+
     raise ValueError(f"지원하지 않는 framework입니다: {framework}")
 
 
