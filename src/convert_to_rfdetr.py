@@ -1,6 +1,6 @@
 """COCO 포맷 데이터를 RF-DETR가 기대하는 디렉터리 구조로 변환한다.
 
-data/processed/{train,val}/images + annotations.json 을
+data/processed/coco/{train,val}/images + annotations.json (prepare_split.py 결과) 을
 data/processed/rfdetr/{train,valid}/*.png + _annotations.coco.json 으로 변환한다
 (RF-DETR는 Roboflow 스타일로 각 split 폴더에 이미지와 _annotations.coco.json이
 함께 있어야 함). 이미지는 복사 대신 심볼릭 링크로 연결한다.
@@ -34,7 +34,7 @@ def convert_split(src_dir: Path, dst_dir: Path) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--processed-dir", type=str, default="data/processed")
+    parser.add_argument("--processed-dir", type=str, default="data/processed/coco")
     parser.add_argument("--output-dir", type=str, default="data/processed/rfdetr")
     return parser.parse_args()
 

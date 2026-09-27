@@ -37,7 +37,7 @@ def list_image_paths(image_arg: str) -> list[Path]:
 
 def load_category_id_map(processed_dir: str) -> dict[str, int]:
     """category_mapping.json(label/category_id/name)에서 클래스명 -> 제출용 category_id 매핑을 만든다."""
-    mapping_path = Path(processed_dir) / "splits" / "category_mapping.json"
+    mapping_path = Path(processed_dir) / "coco" / "splits" / "category_mapping.json"
     with open(mapping_path, "r", encoding="utf-8") as f:
         mapping = json.load(f)
     return {entry["name"]: entry["category_id"] for entry in mapping}

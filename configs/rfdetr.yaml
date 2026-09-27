@@ -1,9 +1,11 @@
 # RF-DETR 트랙 실험 설정.
-# 학습 전에 `python src/convert_to_rfdetr.py`로 data/processed/rfdetr/{train,valid}를 만들어야 한다.
+# 학습 전에 `python src/prepare_split.py --config configs/rfdetr.yaml`로
+# data/processed/coco/{train,val}를 만들고, `python src/convert_to_rfdetr.py`로
+# data/processed/rfdetr/{train,valid}를 만들어야 한다.
 
 data:
   raw_dir: data/raw
-  processed_dir: data/processed
+  processed_dir: data/processed # prepare_split.py가 이 아래 coco/ 서브폴더에 결과를 저장함
   rfdetr_dir: data/processed/rfdetr # convert_to_rfdetr.py가 생성하는 train/valid 디렉터리
   num_classes: 56
   max_objects_per_image: 4

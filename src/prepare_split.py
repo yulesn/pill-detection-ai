@@ -9,13 +9,13 @@ transform)를 만들면 되도록 하기 위함이다.
 사용 예:
     python src/prepare_split.py --config configs/default.yaml --val-ratio 0.2
 
-출력:
-    data/processed/train/images/                      — train 이미지
-    data/processed/train/annotations.json — train 표준 COCO annotation
-    data/processed/val/images/                        — val 이미지
-    data/processed/val/annotations.json   — val 표준 COCO annotation
-    data/processed/splits/train_ids.json, val_ids.json     — 분할 결과 audit용 image_id 목록
-    data/processed/splits/invalid_images.json              — 오류가 발견되어 제외한 이미지와 사유
+출력 (config['data']['processed_dir'] 아래 coco/ 서브폴더에 저장):
+    data/processed/coco/train/images/                      — train 이미지
+    data/processed/coco/train/annotations.json — train 표준 COCO annotation
+    data/processed/coco/val/images/                        — val 이미지
+    data/processed/coco/val/annotations.json   — val 표준 COCO annotation
+    data/processed/coco/splits/train_ids.json, val_ids.json     — 분할 결과 audit용 image_id 목록
+    data/processed/coco/splits/invalid_images.json              — 오류가 발견되어 제외한 이미지와 사유
 """
 
 import argparse
@@ -36,6 +36,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="configs/default.yaml")
     parser.add_argument("--val-ratio", type=float, default=0.2)
+    parser.add_argument(
+        "--image-dir",
+        type=str,
+        default=None,
+        help="원본 이미지 폴더. 기본값은 config['data']['raw_dir']/sprint_ai_project1_data/train_images. "
+        "AI Hub 추가 데이터(src/download_additional_data.py 결과)를 쓰려면 "
+        "data/augmented/raw/images 처럼 지정",
+    )
+    parser.add_argument(
+        "--ann-dir",
+        type=str,
+        default=None,
+        help="원본 annotation 폴더. 기본값은 config['data']['raw_dir']/sprint_ai_project1_data/train_annotations. "
+        "AI Hub 추가 데이터를 쓰려면 data/augmented/raw/annotations 처럼 지정",
+    )
     return parser.parse_args()
 
 
@@ -239,8 +254,8 @@ def main() -> None:
     set_seed(config["train"]["seed"])
 
     data_dir = Path(config["data"]["raw_dir"]) / DATASET_DIR_NAME
-    image_dir = data_dir / "train_images"
-    annotation_dir = data_dir / "train_annotations"
+    image_dir = Path(args.image_dir) if args.image_dir else data_dir / "train_images"
+    annotation_dir = Path(args.ann_dir) if args.ann_dir else data_dir / "train_annotations"
 
     images, annotations, categories = load_annotations(annotation_dir)
     print(f"전체 이미지 {len(images)}개, 카테고리 {len(categories)}개 로드")
@@ -273,7 +288,7 @@ def main() -> None:
     valid_categories = {cat_id: categories[cat_id] for cat_id in valid_category_ids}
     cat_id_to_label = build_cat_id_to_label(valid_categories)
 
-    processed_dir = Path(config["data"]["processed_dir"])
+    processed_dir = Path(config["data"]["processed_dir"]) / "coco"
     train_dir = processed_dir / "train"
     val_dir = processed_dir / "val"
     copy_split(images, annotations, categories, cat_id_to_label, train_ids, image_dir, train_dir)
