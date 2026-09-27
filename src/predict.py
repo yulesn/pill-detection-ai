@@ -6,12 +6,10 @@
     # RF-DETR
     python src/predict.py --config configs/rfdetr.yaml --checkpoint outputs/rfdetr_nano/checkpoints/checkpoint_best_ema.pth --test_dir data/raw/sprint_ai_project1_data/test_images
 """
-import os
 import argparse
 import json
 from pathlib import Path
 
-import pandas as pd
 from ultralytics import YOLO
 
 from model import build_model
@@ -45,68 +43,72 @@ def load_category_id_map(processed_dir: str) -> dict[str, int]:
     return {entry["name"]: entry["category_id"] for entry in mapping}
 
 
+def yolo_detect(model, image_path: str, label_map: dict) -> list[dict]:
+    """한 이미지에 대한 YOLO 추론 결과를 {category_id, bbox_xyxy, score} 리스트로 반환."""
+    results = model.predict(source=image_path, conf=0.25, save=False, iou=0.1, max_det=4, verbose=False)
+    detections = []
+    for box in results[0].boxes:
+        category_idx = int(box.cls[0].item())    # tensor 객체를 가져와 int로 변환
+        category_id = int(label_map[category_idx].split('-')[1])
+        score = float(box.conf[0].item())
+        x1, y1, x2, y2 = box.xyxy[0].tolist()
+        detections.append({"category_id": category_id, "bbox_xyxy": (x1, y1, x2, y2), "score": score})
+    return detections
+
+
+def rfdetr_detect(
+    model, image_path: str, class_names: dict, category_id_map: dict, threshold: float = 0.5
+) -> list[dict]:
+    """한 이미지에 대한 RF-DETR 추론 결과를 {category_id, bbox_xyxy, score} 리스트로 반환."""
+    result = model.predict(image_path, threshold=threshold)
+    detections = []
+    for class_id, bbox, score in zip(result.class_id, result.xyxy, result.confidence):
+        x1, y1, x2, y2 = bbox.tolist()
+        class_name = class_names[int(class_id)]
+        detections.append(
+            {"category_id": category_id_map[class_name], "bbox_xyxy": (x1, y1, x2, y2), "score": float(score)}
+        )
+    return detections
+
+
+def detections_to_rows(image_id: int | str, detections: list[dict]) -> list[dict]:
+    """detect 함수들이 반환한 결과를 save_predictions_csv용 row로 변환 (bbox: xyxy -> xywh)."""
+    rows = []
+    for det in detections:
+        x1, y1, x2, y2 = det["bbox_xyxy"]
+        rows.append(
+            {
+                "image_id": image_id,
+                "category_id": det["category_id"],
+                "bbox_x": round(x1),
+                "bbox_y": round(y1),
+                "bbox_w": round(x2 - x1),
+                "bbox_h": round(y2 - y1),
+                "score": round(det["score"], 4),
+            }
+        )
+    return rows
+
+
 def main() -> None:
     args = parse_args()
     config = load_config(args.config)
     framework = config["model"]["framework"]
+    image_paths = list_image_paths(args.test_dir)
 
     if framework == "yolo":
-        data_file_path = config['data']['yaml_path']
-        data_file = load_config(data_file_path)
-
+        data_file = load_config(config["data"]["yaml_path"])
+        label_map = data_file["names"]  # 모델 예측 결과를 데이터 제출 형식에 맞춤
         model = YOLO(args.checkpoint)
-        results = model.predict(source=args.test_dir, conf=0.25, save=False, iou=0.1, max_det=4)
-        label_map = data_file['names']  # 모델 예측 결과를 데이터 제출 형식에 맞춤
-        results_list = []
-        annotation_counter = 1
 
-        for result in results:
-            # image_id 추출
-            file_name = os.path.basename(result.path)
-            image_id = os.path.splitext(file_name)[0]
-
-            try:
-                image_id = int(image_id)
-            except ValueError:
-                pass
-
-            # BBox 파싱
-            for box in result.boxes:
-                category_idx = int(box.cls[0].item())    # tensor 객체를 가져와 int로 변환
-                category_id = int(label_map[category_idx].split('-')[1])
-                score = round(float(box.conf[0].item()), 3)
-
-                # xyxy -> xywh 변환
-                x_min, y_min, x_max, y_max = box.xyxy[0].tolist()
-                bbox_x = round(x_min, 1)
-                bbox_y = round(y_min, 1)
-                bbox_w = round((x_max - x_min), 1)
-                bbox_h = round((y_max - y_min), 1)
-
-                results_list.append({
-                    'annotation_id': annotation_counter,
-                    'image_id': image_id,
-                    'category_id': category_id,
-                    'bbox_x': bbox_x,
-                    'bbox_y': bbox_y,
-                    'bbox_w': bbox_w,
-                    'bbox_h': bbox_h,
-                    'score': score
-                })
-                annotation_counter += 1
+        results = []
+        for image_path in image_paths:
+            image_id = int(image_path.stem) if image_path.stem.isdigit() else image_path.stem
+            results.extend(detections_to_rows(image_id, yolo_detect(model, str(image_path), label_map)))
 
         output_csv = args.output_csv or "outputs/predictions/submission.csv"
-
-        # DataFrame 변환 및 csv로 저장
-        df_sub = pd.DataFrame(results_list)
-
-        # 컬럼 순서 명시적 지정
-        columns_order = ['annotation_id', 'image_id', 'category_id', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'score']
-        df_sub = df_sub[columns_order]
-
-        df_sub.to_csv(output_csv, index=False)
-        print(f'[{output_csv}]파일 생성 완료')
-        print(f'총 {len(df_sub)}개의 Bounding Box 감지 결과가 작성되었습니다.')
+        save_predictions_csv(results, output_csv)
+        print(f"{len(image_paths)}장 이미지에서 예측 {len(results)}건을 {output_csv}에 저장했습니다.")
         return
 
     if framework == "torchvision":
@@ -121,28 +123,12 @@ def main() -> None:
         # model.class_names: {1: "약이름", 2: "약이름", ...} (학습 때 쓴 categories 순서 그대로,
         # 체크포인트에 저장돼있어서 checkpoint만 넘겨서 만든 모델에서도 값이 채워짐)
         class_names = model.class_names
-        image_paths = list_image_paths(args.test_dir)
 
         results = []
         for image_path in image_paths:
             image_id = int(image_path.stem) if image_path.stem.isdigit() else image_path.stem
-            detections = model.predict(str(image_path), threshold=0.5)
-            for class_id, bbox, score in zip(
-                detections.class_id, detections.xyxy, detections.confidence
-            ):
-                x1, y1, x2, y2 = bbox.tolist()
-                class_name = class_names[int(class_id)]
-                results.append(
-                    {
-                        "image_id": image_id,
-                        "category_id": category_id_map[class_name],
-                        "bbox_x": round(x1),
-                        "bbox_y": round(y1),
-                        "bbox_w": round(x2 - x1),
-                        "bbox_h": round(y2 - y1),
-                        "score": round(float(score), 4),
-                    }
-                )
+            detections = rfdetr_detect(model, str(image_path), class_names, category_id_map)
+            results.extend(detections_to_rows(image_id, detections))
 
         output_csv = args.output_csv or f"outputs/predictions/{config['output']['experiment_name']}.csv"
         save_predictions_csv(results, output_csv)

@@ -26,3 +26,4 @@ dependencies:
       # RF-DETR 트랙 선택 시 사용. [train] extra가 학습에 필요한 pytorch-lightning/torchmetrics를 같이 설치함
       - rfdetr[train]==1.11.0
       - transformers==5.17.0
+      - ensemble-boxes==1.0.9 # YOLO+RF-DETR WBF 앙상블에서 사용

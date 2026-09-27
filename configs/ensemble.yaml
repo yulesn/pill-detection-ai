@@ -1,0 +1,19 @@
+# YOLO + RF-DETR 앙상블(WBF) 설정.
+# 각 모델의 config는 그 모델 학습에 쓴 configs/*.yaml을 그대로 가리키면 된다
+# (yaml_path, processed_dir 등 프레임워크별로 필요한 값을 그 config에서 읽어옴).
+
+models:
+  - config: configs/exp2_yolo11n.yaml
+    checkpoint: outputs/exp1_yolo11n2/weights/best.pt
+    weight: 1.0
+  - config: configs/rfdetr.yaml
+    checkpoint: outputs/rfdetr_nano/checkpoints/checkpoint_best_ema.pth
+    weight: 1.0
+
+ensemble:
+  iou_thr: 0.5 # 이 이상 겹치는 박스끼리만 WBF로 합침
+  skip_box_thr: 0.0001 # 이 미만 confidence 박스는 무시
+
+output:
+  dir: outputs
+  experiment_name: ensemble_yolo_rfdetr
