@@ -25,12 +25,17 @@ def build_model(config: dict):
         return YOLO(model_name)
 
     if framework == "torchvision":
-        # TODO(torchvision 트랙): torchvision detection 모델 생성
-        # import torchvision
-        # return torchvision.models.detection.__dict__[model_name](
-        #     pretrained=config["model"]["pretrained"]
-        # )
-        raise NotImplementedError("torchvision 분기를 구현해주세요.")
+        import torchvision
+        from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+        num_classes = config["data"]["num_classes"]
+        weights = "DEFAULT" if config["model"]["pretrained"] else None
+        model = torchvision.models.detection.__dict__[config["model"]["name"]](weights=weights)
+
+        # 사전학습 모델의 분류기 마지막 층을, 우리 클래스 개수(57)에 맞게 새로 교체
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+        return model
+    
 
     if framework == "rfdetr":
         from rfdetr import RFDETRLarge, RFDETRMedium, RFDETRNano, RFDETRSmall
