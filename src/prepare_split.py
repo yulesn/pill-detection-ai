@@ -54,25 +54,60 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def load_json_with_fallback_encoding(path: Path) -> dict | None:
+    """utf-8로 읽다가 실패하면 cp949로 한 번 더 시도한다.
+
+    AI Hub 추가 데이터 중 일부 annotation json이 cp949로 인코딩돼 있어서
+    (src/preprocess_augmented.py도 동일한 fallback을 씀), 둘 다 실패하면 None을 반환한다.
+    """
+    for encoding in ("utf-8", "cp949"):
+        try:
+            with open(path, "r", encoding=encoding) as f:
+                return json.load(f)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            continue
+    return None
+
+
 def load_annotations(annotation_dir: Path) -> tuple[dict, dict, dict]:
-    """annotation_dir 아래 json들을 image_id 기준으로 모은다.
+    """annotation_dir 아래 json들을 파일명(file_name) 기준으로 모아서 image_id를 새로 부여한다.
+
+    원본 json의 images[0]['id']/annotations[0]['category_id']/categories[0]는 데이터
+    소스에 따라 신뢰할 수 없다 — AI Hub 추가 데이터(src/download_additional_data.py)는
+    이 값들이 전부 id=1, category_id=1, categories[0]={"name": "Drug", ...} 같은 더미값으로
+    채워져 있어서(원본 경진대회 데이터만 실제 값이 들어있었음), 그대로 쓰면 서로 다른
+    이미지/알약이 같은 id로 뭉쳐져 데이터가 조용히 사라진다. 그래서:
+      - image_id는 file_name 기준으로 이 함수가 직접 순번을 매김 (항상 유일함 보장)
+      - category_id/name은 항상 실제 값이 들어있는 images[0]['dl_mapping_code']/['dl_name']에서 뽑음
 
     return: (images: {image_id: info}, annotations: {image_id: [ann, ...]},
            categories: {cat_id: cat})
     """
+    file_name_to_id: dict[str, int] = {}
     images: dict = {}
     annotations: dict = defaultdict(list)
     categories: dict = {}
+    skipped = 0
     for annotation_file in sorted(annotation_dir.rglob("*.json")):
-        with open(annotation_file, "r") as f:
-            content = json.load(f)
+        content = load_json_with_fallback_encoding(annotation_file)
+        if content is None:
+            skipped += 1
+            continue
         image = content["images"][0]
-        ann = content["annotations"][0]
-        category = content["categories"][0]
-        image_id = image["id"]
+        ann = dict(content["annotations"][0])
+
+        file_name = image["file_name"]
+        image_id = file_name_to_id.setdefault(file_name, len(file_name_to_id) + 1)
+        image = {**image, "id": image_id}
+        cat_id = int(image["dl_mapping_code"].split("-")[1])
+        ann["category_id"] = cat_id
+        ann["image_id"] = image_id
+
         images.setdefault(image_id, image)
         annotations[image_id].append(ann)
-        categories.setdefault(category["id"], category)
+        categories.setdefault(cat_id, {"id": cat_id, "name": image["dl_name"], "supercategory": "pill"})
+    if skipped:
+        print(f"인코딩 오류로 건너뛴 annotation 파일 {skipped}개")
     return images, dict(annotations), categories
 
 
@@ -100,12 +135,22 @@ def compute_iou(box1, box2):
     return inter_area / union_area if union_area > 0 else 0.0
 
 
-def validate_image(info: dict, anns: list, image_dir: Path) -> list[str]:
+def build_image_index(image_dir: Path) -> dict[str, Path]:
+    """image_dir 아래 모든 png를 파일명 기준으로 찾을 수 있게 인덱싱한다.
+
+    원본 데이터는 이미지가 image_dir 바로 아래 평평하게 있지만, AI Hub 추가
+    데이터(data/augmented/raw/images)는 조합별 서브폴더(K-XXX-YYY-ZZZ/) 안에 들어있어서
+    단순히 image_dir / file_name으로는 못 찾는다. 재귀적으로 한 번 인덱싱해두면 둘 다 처리된다.
+    """
+    return {p.name: p for p in image_dir.rglob("*.png")}
+
+
+def validate_image(info: dict, anns: list, image_index: dict[str, Path]) -> list[str]:
     """이미지 한 장에 대해 발견한 문제 목록을 반환한다 (없으면 빈 리스트)."""
     errors = []
     file_name = info["file_name"]
-    image_path = image_dir / file_name
-    if not image_path.exists():
+    image_path = image_index.get(file_name)
+    if image_path is None:
         return [f"이미지 파일 없음: {file_name}"]
 
     try:
@@ -124,6 +169,10 @@ def validate_image(info: dict, anns: list, image_dir: Path) -> list[str]:
 
     for i in range(len(anns)):
         bbox = anns[i]["bbox"]
+        if len(bbox) != 4:
+            # AI Hub 추가 데이터 일부는 bbox가 빈 리스트 []로 비어있음
+            errors.append(f"bbox 형식이 올바르지 않음: {bbox} (annotation id {anns[i]['id']})")
+            continue
         x, y, w, h = bbox
         if w <= 0 or h <= 0:
             errors.append(f"bbox 크기가 0 이하: {bbox} (annotation id {anns[i]['id']})")
@@ -134,6 +183,8 @@ def validate_image(info: dict, anns: list, image_dir: Path) -> list[str]:
             )
         for j in range(i+1,len(anns)):
             next_bbox = anns[j]["bbox"]
+            if len(next_bbox) != 4:
+                continue
             iou = compute_iou(bbox, next_bbox)
             if iou > 0.5:
                 errors.append(
@@ -209,7 +260,7 @@ def copy_split(
     categories: dict,
     cat_id_to_label: dict,
     ids: list,
-    image_dir: Path,
+    image_index: dict[str, Path],
     split_dir: Path,
 ) -> None:
     """ids에 해당하는 이미지를 복사하고, annotation은 표준 COCO 형식 단일
@@ -227,14 +278,18 @@ def copy_split(
 
     coco_annotations = []
     used_category_ids = set()
+    next_ann_id = 1
     for image_id in ids:
         info = images[image_id]
-        shutil.copy2(image_dir / info["file_name"], dst_image_dir / info["file_name"])
+        shutil.copy2(image_index[info["file_name"]], dst_image_dir / info["file_name"])
         for ann in annotations[image_id]:
             used_category_ids.add(ann["category_id"])
+            # ann["id"]도 원본 json에선 신뢰할 수 없는 더미값이라(load_annotations 설명 참고)
+            # split 안에서 유일하도록 새로 번호를 매긴다.
             coco_annotations.append(
-                {**ann, "category_id": cat_id_to_label[ann["category_id"]]}
+                {**ann, "id": next_ann_id, "category_id": cat_id_to_label[ann["category_id"]]}
             )
+            next_ann_id += 1
 
     coco = {
         "images": [images[image_id] for image_id in ids],
@@ -260,9 +315,11 @@ def main() -> None:
     images, annotations, categories = load_annotations(annotation_dir)
     print(f"전체 이미지 {len(images)}개, 카테고리 {len(categories)}개 로드")
 
+    image_index = build_image_index(image_dir)
+
     invalid = {}
     for image_id, info in images.items():
-        errors = validate_image(info, annotations[image_id], image_dir)
+        errors = validate_image(info, annotations[image_id], image_index)
         if errors:
             invalid[image_id] = {"file_name": info["file_name"], "errors": errors}
 
@@ -291,8 +348,8 @@ def main() -> None:
     processed_dir = Path(config["data"]["processed_dir"]) / "coco"
     train_dir = processed_dir / "train"
     val_dir = processed_dir / "val"
-    copy_split(images, annotations, categories, cat_id_to_label, train_ids, image_dir, train_dir)
-    copy_split(images, annotations, categories, cat_id_to_label, val_ids, image_dir, val_dir)
+    copy_split(images, annotations, categories, cat_id_to_label, train_ids, image_index, train_dir)
+    copy_split(images, annotations, categories, cat_id_to_label, val_ids, image_index, val_dir)
 
     report_dir = processed_dir / "splits"
     report_dir.mkdir(parents=True, exist_ok=True)
