@@ -1,0 +1,29 @@
+# RF-DETR 트랙 실험 설정.
+# 학습 전에 아래 순서로 데이터를 준비해야 한다 (원본 + AI Hub 추가 데이터 포함):
+#   python src/prepare_split.py --config configs/rfdetr.yaml \
+#     --image-dir data/augmented/raw/images --ann-dir data/augmented/raw/annotations
+#   python src/convert_to_rfdetr.py
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed 
+  rfdetr_dir: data/processed/rfdetr # convert_to_rfdetr.py가 생성하는 train/valid 디렉터리
+  num_classes: 118 # 원본 56종 + AI Hub 추가 데이터 62종 = 118종 (data/processed/coco/splits/category_mapping.json 기준)
+  max_objects_per_image: 4
+
+model:
+  framework: rfdetr
+  name: rfdetr_nano # rfdetr_nano / rfdetr_small / rfdetr_medium / rfdetr_large
+  pretrained: true
+  checkpoint: null # predict.py 실행 시 --checkpoint 값이 여기에 채워짐
+
+train:
+  epochs: 30
+  batch_size: 16
+  learning_rate: 0.0001
+  seed: 42
+  device: cpu # 학습 서버에서는 cuda로 변경
+
+output:
+  dir: outputs
+  experiment_name: rfdetr_nano_augmented
