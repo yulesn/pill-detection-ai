@@ -1,7 +1,7 @@
 """학습 실행 스크립트.
 
 사용 예:
-    python src/train.py --config configs/fasterrcnn_t5.yaml
+    python src/train.py --config configs/default.yaml
 """
 
 import argparse
@@ -29,16 +29,37 @@ def main() -> None:
     config = load_config(args.config)
     set_seed(config["train"]["seed"])
     framework = config["model"]["framework"]
-    exp_name = config["output"]["experiment_name"]
 
     if framework == "yolo":
-        raise NotImplementedError("YOLO 학습 루프를 구현해주세요.")
+        data_yaml = config["data"]["yaml_path"]
+        epochs = config["train"]["epochs"]
+        batch_size = config["train"]["batch_size"]
+        device = config["train"]["device"]
+
+        output_dir = config["output"]["dir"]
+        exp_name = config["output"]["experiment_name"]
+
+        model = build_model(config)
+
+        results = model.train(
+            data=data_yaml,
+            epochs=epochs,
+            batch=batch_size,
+            device=device,
+            project=output_dir,
+            name=exp_name,
+            seed=config["train"]["seed"],
+            save=True,
+        )
+        print(f"YOLO 학습 완료! 결과 저장 위치: {results.save_dir}")
+        return
 
     if framework == "torchvision":
         import torch
         from torch.amp import autocast, GradScaler
         from torch.utils.data import DataLoader
 
+        exp_name = config["output"]["experiment_name"]
         data_root = config["data"]["raw_dir"] + "/sprint_ai_project1_data"
 
         train_dataset = PillDataset(data_root, train=True, subset="train")
@@ -153,6 +174,7 @@ def main() -> None:
                 torch.save(make_checkpoint(), os.path.join(save_dir, f"kimgun_{exp_name}_best.pt"))
                 print(f"  -> best 갱신, 저장됨 (val_loss: {best_val_loss:.4f})", flush=True)
         return
+
     raise ValueError(f"지원하지 않는 framework입니다: {framework}")
 
 

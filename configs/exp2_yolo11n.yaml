@@ -1,0 +1,25 @@
+# batch_size 16 -> 8
+# epoch: 50 -> 100
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  yaml_path: data/processed/yolo/data.yaml
+  num_classes: 56
+  max_objects_per_image: 4
+
+model:
+  framework: yolo # TODO: yolo 또는 torchvision 중 팀에서 채택한 트랙으로 채우기
+  name: yolo11n.pt # TODO: 팀에서 프레임워크/모델 결정 후 채우기 (예: yolov8s, fasterrcnn_resnet50_fpn)
+  pretrained: true
+
+train:
+  epochs: 100   
+  batch_size: 8 
+  learning_rate: 0.001
+  seed: 42
+  device: cuda # 학습 서버에서는 cuda로 변경
+
+output:
+  dir: outputs
+  experiment_name: exp1_yolo11n
