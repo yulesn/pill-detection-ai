@@ -10,10 +10,10 @@
 """
 import argparse
 import json
+import os
 from pathlib import Path
 
 from ultralytics import YOLO
-from pathlib import Path
 
 import pandas as pd
 
@@ -143,8 +143,6 @@ def main() -> None:
         import torch
         from PIL import Image
         from torchvision.transforms import functional as TF
-
-        from model import build_model
 
         device = torch.device(config["train"]["device"] if torch.cuda.is_available() else "cpu")
         model = build_model(config)
