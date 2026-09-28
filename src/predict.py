@@ -13,9 +13,6 @@ import json
 from pathlib import Path
 
 from ultralytics import YOLO
-from pathlib import Path
-
-import pandas as pd
 
 from model import build_model
 from utils import load_config, save_predictions_csv
@@ -99,6 +96,34 @@ def rfdetr_detect(
     return detections
 
 
+def torchvision_detect(
+    model, image_path: str, device, label_to_raw_id: dict, conf: float, iou: float, max_det: int
+) -> list[dict]:
+    """한 이미지에 대한 torchvision(Faster R-CNN) 추론 결과를 {category_id, bbox_xyxy, score} 리스트로 반환.
+
+    torchvision 모델은 YOLO/RF-DETR와 달리 자체 conf 필터링·클래스별 NMS를 안 해주므로
+    여기서 직접 conf 임계값 적용 -> 클래스별 NMS -> 점수 높은 순 max_det개로 자른다.
+    """
+    import torch
+    from PIL import Image
+    from torchvision.transforms import functional as TF
+
+    image = Image.open(image_path).convert("RGB")
+    with torch.no_grad():
+        output = model([TF.to_tensor(image).to(device)])[0]
+    boxes = output["boxes"].cpu().tolist()
+    scores = output["scores"].cpu().tolist()
+    labels = output["labels"].cpu().tolist()
+
+    dets = [(s, int(l), b) for b, s, l in zip(boxes, scores, labels) if s >= conf]
+    dets = nms_per_class(dets, iou)[:max_det]
+
+    return [
+        {"category_id": int(label_to_raw_id[label]), "bbox_xyxy": tuple(bbox), "score": float(score)}
+        for score, label, bbox in dets
+    ]
+
+
 def detections_to_rows(image_id: int | str, detections: list[dict]) -> list[dict]:
     """detect 함수들이 반환한 결과를 save_predictions_csv용 row로 변환 (bbox: xyxy -> xywh)."""
     rows = []
@@ -141,10 +166,6 @@ def main() -> None:
 
     if framework == "torchvision":
         import torch
-        from PIL import Image
-        from torchvision.transforms import functional as TF
-
-        from model import build_model
 
         device = torch.device(config["train"]["device"] if torch.cuda.is_available() else "cpu")
         model = build_model(config)
@@ -154,50 +175,19 @@ def main() -> None:
         model.to(device)
         model.eval()
 
-        image_files = sorted(Path(args.test_dir).rglob("*.png"))
-        results_list = []
-        annotation_counter = 1
+        results = []
+        for i, image_path in enumerate(image_paths, start=1):
+            image_id = int(image_path.stem) if image_path.stem.isdigit() else image_path.stem
+            detections = torchvision_detect(
+                model, str(image_path), device, label_to_raw_id, args.conf, args.iou, args.max_det
+            )
+            results.extend(detections_to_rows(image_id, detections))
+            if i % 100 == 0 or i == len(image_paths):
+                print(f"  {i}/{len(image_paths)}장 예측 완료", flush=True)
 
-        with torch.no_grad():
-            for i, image_file in enumerate(image_files, start=1):
-                image = Image.open(image_file).convert("RGB")
-                output = model([TF.to_tensor(image).to(device)])[0]
-                boxes = output["boxes"].cpu().tolist()
-                scores = output["scores"].cpu().tolist()
-                labels = output["labels"].cpu().tolist()
-
-                # 점수 기준 -> 같은 클래스끼리 겹침 제거 -> 점수 높은 순으로 max_det 개
-                dets = [(s, int(l), b) for b, s, l in zip(boxes, scores, labels) if s >= args.conf]
-                dets = nms_per_class(dets, args.iou)[:args.max_det]
-
-                image_id = os.path.splitext(image_file.name)[0]
-                try:
-                    image_id = int(image_id)
-                except ValueError:
-                    pass
-
-                for score, label, (x_min, y_min, x_max, y_max) in dets:
-                    results_list.append({
-                        'annotation_id': annotation_counter,
-                        'image_id': image_id,
-                        'category_id': int(label_to_raw_id[label]),
-                        'bbox_x': round(x_min, 1),
-                        'bbox_y': round(y_min, 1),
-                        'bbox_w': round(x_max - x_min, 1),
-                        'bbox_h': round(y_max - y_min, 1),
-                        'score': round(float(score), 3),
-                    })
-                    annotation_counter += 1
-
-                if i % 100 == 0 or i == len(image_files):
-                    print(f"  {i}/{len(image_files)}장 예측 완료", flush=True)
-
-        columns_order = ['annotation_id', 'image_id', 'category_id', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'score']
-        df_sub = pd.DataFrame(results_list, columns=columns_order)
-        os.makedirs(os.path.dirname(args.output_csv) or ".", exist_ok=True)
-        df_sub.to_csv(args.output_csv, index=False)
-        print(f'[{args.output_csv}]파일 생성 완료')
-        print(f'총 {len(df_sub)}개의 Bounding Box 감지 결과가 작성되었습니다.')
+        output_csv = args.output_csv or "outputs/predictions/submission.csv"
+        save_predictions_csv(results, output_csv)
+        print(f"{len(image_paths)}장 이미지에서 예측 {len(results)}건을 {output_csv}에 저장했습니다.")
         return
 
     if framework == "rfdetr":
