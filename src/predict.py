@@ -266,7 +266,7 @@ def predict(
 # 7. Submission CSV 저장
 # ============================================================
 
-def save_submission(rows, conf):
+def save_submission(rows, conf, model_name):
 
     fieldnames = [
         "annotation_id",
@@ -279,7 +279,8 @@ def save_submission(rows, conf):
         "score"
     ]
     submission_path = (
-        PROJECT_ROOT / f"submission_conf{conf:.2f}.csv"
+        PROJECT_ROOT / 
+        f"submission_{model_name}_conf{conf:.2f}.csv"
     )
     with open(
         submission_path,
@@ -322,6 +323,7 @@ def main():
     checkpoint_path = Path(
         args.checkpoint
     )
+    model_name = checkpoint_path.stem
 
     image_path = Path(
         args.image
@@ -379,8 +381,9 @@ def main():
 
     # Submission 저장
     submission_path = save_submission(
-    rows,
-    args.conf
+        rows,
+        args.conf,
+        model_name
     )
 
     # 결과 출력
