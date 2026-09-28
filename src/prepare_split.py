@@ -102,6 +102,14 @@ def load_annotations(annotation_dir: Path) -> tuple[dict, dict, dict]:
         cat_id = int(image["dl_mapping_code"].split("-")[1])
         ann["category_id"] = cat_id
         ann["image_id"] = image_id
+        # area/iscrowd도 AI Hub 데이터 일부는 area가 None이거나 리스트([33820])로,
+        # iscrowd가 0/1이 아닌 엉뚱한 값(58548 등)으로 깨져있어서 학습 중 DataLoader가
+        # torch.as_tensor(...)에서 죽는다. bbox가 정상(길이 4)이면 area는 직접
+        # 계산해서 덮어쓰고, iscrowd는 1이 아니면 전부 0으로 정규화한다.
+        bbox = ann.get("bbox")
+        if isinstance(bbox, list) and len(bbox) == 4:
+            ann["area"] = bbox[2] * bbox[3]
+        ann["iscrowd"] = 1 if ann.get("iscrowd") == 1 else 0
 
         images.setdefault(image_id, image)
         annotations[image_id].append(ann)
