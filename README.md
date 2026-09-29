@@ -6,11 +6,11 @@
 
 | 이름 | 담당 |
 |---|---|
-| 신유정 | (담당 업무) |
-| 김건 | (담당 업무) |
-| 김예원 | (담당 업무) |
-| 원재민 | (담당 업무) |
-| 이주엽 | (담당 업무) |
+| 신유정 | Github 관리, 리팩토링, RF-DETR, 앙상블 |
+| 김건 | Faster R-CNN, 성능 고도화, 회의록 작성, 중간 발표자료 취합 |
+| 김예원 | RetinaNet, 최종 발표자료 작성 |
+| 원재민 | YOLO, 모델 학습 관련 자료 작성 |
+| 이주엽 | YOLO, 데이터 관련 자료 작성 |
 
 ## 기술 스택
 
@@ -162,5 +162,6 @@ python src/ensemble_predict.py --config configs/ensemble.yaml --test_dir data/ra
 
 ## 관련 문서
 
-- 최종 보고서: (링크)
-- 협업 일지: (링크)
+- [최종 보고서](https://docs.google.com/document/d/1G2X_GlFj1z1Y2zsRvPP87EoEA64yCrri0WvsVgD1600/edit?usp=sharing)
+- [협업 일지](https://app.notion.com/p/3d7232ca6c7b801081e2e1820e421042?v=3d7232ca6c7b803f9a1d000c3bdfb74b&source=copy_link)
+- [Notion](https://app.notion.com/p/AI-3d7232ca6c7b8097a511d1e2535751d4?source=copy_link)
