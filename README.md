@@ -162,6 +162,6 @@ python src/ensemble_predict.py --config configs/ensemble.yaml --test_dir data/ra
 
 ## 관련 문서
 
-- [최종 보고서](https://docs.google.com/document/d/1G2X_GlFj1z1Y2zsRvPP87EoEA64yCrri0WvsVgD1600/edit?usp=sharing)
+- [최종 보고서](https://github.com/yulesn/pill-detection-ai/blob/main/%5BAI%5D%20%EC%B4%88%EA%B8%89%20%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8%204%ED%8C%80%20%EB%B3%B4%EA%B3%A0%EC%84%9C.pdf?raw=true)
 - [협업 일지](https://app.notion.com/p/3d7232ca6c7b801081e2e1820e421042?v=3d7232ca6c7b803f9a1d000c3bdfb74b&source=copy_link)
 - [Notion](https://app.notion.com/p/AI-3d7232ca6c7b8097a511d1e2535751d4?source=copy_link)
