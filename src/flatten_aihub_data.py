@@ -31,21 +31,15 @@ def flatten(src_dir: str, dst_dir: str):
         return
 
     count = 0
-    skipped = 0
 
     # 하위 폴더가 몇 겹이든 상관없이 전체 파일을 재귀적으로 찾음
-    for f in src.rglob("*"):
+    for f in src.rglob('*'):
         if f.is_file():
-            target = dst / f.name
-            if target.exists():
-                # 이름이 겹치면 건너뛰고 경고만 출력
-                print(f"[SKIP] 이미 존재함: {f.name}")
-                skipped += 1
-                continue
+            new_filename = f"{f.parent.name}_{f.name}"
+            target = dst / new_filename           
             shutil.copy2(f, target)
             count += 1
-
-    print(f"\n완료: {count}개 파일 복사, {skipped}개 건너뜀")
+    print(f'완료: {count}개 파일 복사')
     print(f"목적지: {dst}")
 
 if __name__ == '__main__':

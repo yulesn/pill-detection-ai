@@ -4,7 +4,7 @@
 data:
   raw_dir: data/raw
   processed_dir: data/processed
-  num_classes: 57 # TODO: 알약 클래스 개수 확정되면 채우기 (56 + 배경 포함 1 = 57)
+  num_classes: 56 # TODO: 알약 클래스 개수 확정되면 채우기 (실제 약품 class 수)
   max_objects_per_image: 4
 
 model:
@@ -13,9 +13,9 @@ model:
   pretrained: true
 
 train:
-  epochs: 100
+  epochs: 20
   batch_size: 8
-  learning_rate: 0.001
+  learning_rate: 0.0001
   seed: 42
   device: mps # 학습 서버에서는 cuda로 변경
 
