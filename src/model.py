@@ -48,7 +48,21 @@ def _replace_classification_head(model, num_classes: int) -> None:
 
         in_features = model.roi_heads.box_predictor.cls_score.in_features
         model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
-    #elif hasattr(model, "head") and hasattr(model.head, "classification_head"):
+    elif hasattr(model, "head") and hasattr(model.head, "classification_head"):
+        # RetinaNet 계열: 분류 head가 두 단계(ROI)가 아니라 앵커별 conv 하나라서
+        # FastRCNNPredictor처럼 통째로 못 바꾸고, 마지막 conv layer만 클래스 수에 맞게 새로 만든다.
+        import torch
+
+        cls_head = model.head.classification_head
+        in_channels = cls_head.cls_logits.in_channels
+        num_anchors = cls_head.num_anchors
+
+        cls_head.num_classes = num_classes
+        cls_head.cls_logits = torch.nn.Conv2d(
+            in_channels, num_anchors * num_classes, kernel_size=3, stride=1, padding=1
+        )
+        torch.nn.init.normal_(cls_head.cls_logits.weight, std=0.01)
+        torch.nn.init.constant_(cls_head.cls_logits.bias, 0)
     else:
         raise NotImplementedError(
             f"{type(model).__name__}의 분류 head 교체 로직이 구현되어 있지 않습니다."
