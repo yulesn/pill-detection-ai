@@ -191,7 +191,8 @@ def predict(
         conf=conf,
         save=False,
         verbose=True,
-        stream=True
+        stream=True,
+        batch=8
     )
 
     rows = []
