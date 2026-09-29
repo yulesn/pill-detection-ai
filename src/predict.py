@@ -66,6 +66,12 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+    "--max_det",
+    type=int,
+    default=4
+    )
+
+    parser.add_argument(
         "--checkpoint",
         type=str,
         required=True
@@ -177,7 +183,8 @@ def predict(
     model,
     image_path,
     class_to_category,
-    conf=0.25
+    conf=0.25,
+    max_det=4
 ):
     """
     이미지 또는 이미지 폴더를 YOLO로 추론한다.
@@ -192,7 +199,8 @@ def predict(
         save=False,
         verbose=True,
         stream=True,
-        batch=8
+        batch=8,
+        max_det=max_det
     )
 
     rows = []
@@ -377,7 +385,8 @@ def main():
         model=model,
         image_path=image_path,
         class_to_category=class_to_category,
-        conf=args.conf
+        conf=args.conf,
+        max_det=args.max_det
     )
 
     # Submission 저장
